@@ -84,6 +84,9 @@
   .field input,.field select,.field textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;background:var(--card);font-family:var(--font-body);font-size:16px;padding:10px 12px;outline:none}
   .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green)}
   .field textarea{resize:vertical;min-height:64px}
+  .field input[type="date"]{-webkit-appearance:none;appearance:none;display:block;width:100%;min-width:0;max-width:100%;min-height:46px;text-align:left}
+  .field input[type="date"]::-webkit-date-and-time-value{text-align:left}
+  .sheet-body{overflow-x:hidden}
 
   /* receipt = signature element */
   .receipt{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:16px 16px 14px;margin:16px 0 14px;position:relative;font-size:14.5px;
@@ -331,7 +334,7 @@ function orderText(){
   const shop = document.getElementById("shop").value.trim() || "(ไม่ระบุชื่อร้าน)";
   const date = document.getElementById("date").value || "พรุ่งนี้";
   const note = document.getElementById("note").value.trim();
-  let t = `📋 ออเดอร์: ${shop}\n📅 รับของ: ${date}\n———————\n`;
+  let t = `รายการสั่งซื้อ\n📋 ออเดอร์: ${shop}\n📅 รับของ: ${date}\n———————\n`;
   for(const [n,q] of Object.entries(cart)){
     const p = find(n);
     t += `• ${n} ${fmt(q)} ${p.u} = ${p.p*q} บาท\n`;
