@@ -334,7 +334,7 @@ function orderText(){
   const shop = document.getElementById("shop").value.trim() || "(ไม่ระบุชื่อร้าน)";
   const date = document.getElementById("date").value || "พรุ่งนี้";
   const note = document.getElementById("note").value.trim();
-  let t = `รายการสั่งซื้อ\n📋 ออเดอร์: ${shop}\n📅 รับของ: ${date}\n———————\n`;
+  let t = `รายการสั่งซื้อ\nออเดอร์: ${shop}\nรับของ: ${date}\n———————\n`;
   for(const [n,q] of Object.entries(cart)){
     const p = find(n);
     t += `• ${n} ${fmt(q)} ${p.u} = ${p.p*q} บาท\n`;
