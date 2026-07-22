@@ -343,23 +343,29 @@ function orderText(){
   if(note) t += `\n📝 ${note}`;
   return t;
 }
-function requireShopName(){
+function validateOrder(){
   const shopInput = document.getElementById("shop");
   if(!shopInput.value.trim()){
     shopInput.focus();
     toast("กรุณากรอกชื่อร้าน/ลูกค้าก่อนส่งออเดอร์");
     return false;
   }
+  const dateInput = document.getElementById("date");
+  if(!dateInput.value || dateInput.value < dateInput.min){
+    dateInput.focus();
+    toast("กรุณาเลือกวันที่รับของตั้งแต่พรุ่งนี้เป็นต้นไป");
+    return false;
+  }
   return true;
 }
 function copyOrder(){
-  if(!requireShopName()) return;
+  if(!validateOrder()) return;
   navigator.clipboard.writeText(orderText())
     .then(()=>toast("คัดลอกแล้ว วางส่งใน LINE ได้เลย ✓"))
     .catch(()=>toast("คัดลอกไม่สำเร็จ ลองกดค้างเลือกข้อความแทน"));
 }
 function sendLine(){
-  if(!requireShopName()) return;
+  if(!validateOrder()) return;
   const url = "https://line.me/R/oaMessage/%40746wpose/?" + encodeURIComponent(orderText());
   copyOrder();
   window.open(url,"_blank");
@@ -418,6 +424,14 @@ async function loadPrices(){
   const dateInput = document.getElementById("date");
   dateInput.value = minDate;
   dateInput.min = minDate; // ห้ามเลือกวันนี้หรือย้อนหลัง เลือกได้ตั้งแต่พรุ่งนี้เป็นต้นไป
+  // มือถือบางรุ่น (โดยเฉพาะ iOS Safari) ไม่ทำให้วันที่ต้องห้ามเป็นสีจางในปฏิทิน
+  // จึงต้องดักแก้ตอนเลือกเสร็จ (change) อีกชั้น เผื่อผู้ใช้กดวันที่ผ่านมาแล้วได้
+  dateInput.addEventListener("change", function(){
+    if(this.value && this.value < this.min){
+      toast("เลือกได้ตั้งแต่พรุ่งนี้เป็นต้นไปนะคะ ปรับให้แล้วค่ะ");
+      this.value = this.min;
+    }
+  });
   renderChips(); render();
   loadPrices();
 })();
