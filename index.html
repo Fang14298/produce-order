@@ -121,7 +121,7 @@
   <header>
     <div class="shop-name">🥬 ร้านสวนผักสด</div>
     <div class="shop-sub">ผัก-ผลไม้สดใหม่ ส่งตรงถึงครัวร้านคุณ</div>
-    <div class="cutoff">⏰ สั่งก่อน 20:00 น. — ส่งเช้าวันถัดไป (ส่งฟรีเมื่อครบ 500 บาท)</div>
+    <div class="cutoff">⏰ สั่งก่อน 19:00 น. — ส่งเช้าวันถัดไป (ส่งฟรีในระยะ 10 กิโลเมตร)</div>
   </header>
 
   <div class="sticky">
@@ -152,8 +152,8 @@
   </div>
   <div class="sheet-body">
     <div class="field">
-      <label for="shop">ชื่อร้าน / ลูกค้า</label>
-      <input id="shop" type="text" placeholder="พิมพ์ชื่อร้านของคุณ เช่น ครัวริมปิง" autocomplete="organization">
+      <label for="shop">ชื่อร้าน / ลูกค้า <span style="color:#C0392B">*</span></label>
+      <input id="shop" type="text" required placeholder="พิมพ์ชื่อร้านของคุณ เช่น ครัวริมปิง" autocomplete="organization">
     </div>
     <div class="field">
       <label for="date">วันที่รับของ</label>
@@ -272,7 +272,7 @@ function render(){
   let items = PRODUCTS.filter(p =>
     (activeCat==="ทั้งหมด"||p.c===activeCat) && (!q||p.n.includes(q)));
   const list = document.getElementById("list");
-  if(!items.length){ list.innerHTML = `<div class="empty">ไม่พบ “${q}” — ลองพิมพ์ชื่ออื่น หรือแจ้งเพิ่มในหมายเหตุตอนสรุปออเดอร์ได้เลย</div>`; updateBar(); return; }
+  if(!items.length){ list.innerHTML = `<div class="empty">ไม่พบ "${q}" — ลองพิมพ์ชื่ออื่น หรือแจ้งเพิ่มในหมายเหตุตอนสรุปออเดอร์ได้เลย</div>`; updateBar(); return; }
   let html = "", lastCat = "";
   for(const p of items){
     if(p.c!==lastCat){ html += `<div class="cat-head">${p.c}</div>`; lastCat=p.c; }
@@ -326,7 +326,7 @@ function renderReceipt(){
   }).join("");
   document.getElementById("receipt").innerHTML = `
     <div class="r-head">ใบสั่งซื้อ — ร้านสวนผักสด</div>
-    <div class="r-sub">สั่งก่อน 20:00 น. ส่งเช้าวันถัดไป</div>
+    <div class="r-sub">สั่งก่อน 19:00 น. ส่งเช้าวันถัดไป</div>
     <hr class="r-line">${rows}<hr class="r-line">
     <div class="r-total"><span>รวมทั้งหมด</span><span>${money(cartTotal())}</span></div>`;
 }
@@ -343,12 +343,23 @@ function orderText(){
   if(note) t += `\n📝 ${note}`;
   return t;
 }
+function requireShopName(){
+  const shopInput = document.getElementById("shop");
+  if(!shopInput.value.trim()){
+    shopInput.focus();
+    toast("กรุณากรอกชื่อร้าน/ลูกค้าก่อนส่งออเดอร์");
+    return false;
+  }
+  return true;
+}
 function copyOrder(){
+  if(!requireShopName()) return;
   navigator.clipboard.writeText(orderText())
     .then(()=>toast("คัดลอกแล้ว วางส่งใน LINE ได้เลย ✓"))
     .catch(()=>toast("คัดลอกไม่สำเร็จ ลองกดค้างเลือกข้อความแทน"));
 }
 function sendLine(){
+  if(!requireShopName()) return;
   const url = "https://line.me/R/oaMessage/%40746wpose/?" + encodeURIComponent(orderText());
   copyOrder();
   window.open(url,"_blank");
@@ -403,7 +414,10 @@ async function loadPrices(){
 /* ================= init ================= */
 (function(){
   const d = new Date(); d.setDate(d.getDate()+1);
-  document.getElementById("date").value = d.toISOString().slice(0,10);
+  const minDate = d.toISOString().slice(0,10);
+  const dateInput = document.getElementById("date");
+  dateInput.value = minDate;
+  dateInput.min = minDate; // ห้ามเลือกวันนี้หรือย้อนหลัง เลือกได้ตั้งแต่พรุ่งนี้เป็นต้นไป
   renderChips(); render();
   loadPrices();
 })();
