@@ -184,6 +184,12 @@
 // และตั้งค่าแชร์เป็น "ทุกคนที่มีลิงก์ - ผู้มีสิทธิ์ดู"
 const SHEET_ID = "1ihPCg3VKhS59B5RrlKuvFZi9IsZesESkXmrb02cS-84";
 
+// วาง Web App URL ที่ได้จากการ Deploy Google Apps Script ในเครื่องหมายคำพูดด้านล่าง
+// (สคริปต์อยู่ในไฟล์ examples/google-apps-script.gs)
+const SHEET_WEBHOOK_URL = "";
+const SHOP_STORAGE_KEY = "produce_order_shop_name";
+
+
 /* ================= data (ใช้เมื่อยังไม่เชื่อมชีท หรือโหลดชีทไม่สำเร็จ) ================= */
 let PRODUCTS = [
   // ผักใบ
@@ -358,16 +364,76 @@ function validateOrder(){
   }
   return true;
 }
+function loadShopName(){
+  try{
+    const saved = localStorage.getItem(SHOP_STORAGE_KEY);
+    if(saved){
+      const el = document.getElementById("shop");
+      if(el) el.value = saved;
+    }
+  }catch(e){}
+}
+function saveShopName(val){
+  try{
+    if(val && val.trim()){
+      localStorage.setItem(SHOP_STORAGE_KEY, val.trim());
+    }
+  }catch(e){}
+}
+function buildOrderPayload(){
+  const shop = document.getElementById("shop").value.trim() || "(ไม่ระบุชื่อร้าน)";
+  const date = document.getElementById("date").value || "พรุ่งนี้";
+  const note = document.getElementById("note").value.trim();
+  const items = Object.entries(cart).map(([n,q])=>{
+    const p = find(n);
+    return { name: n, qty: q, unit: p.u, price: p.p, subtotal: p.p*q };
+  });
+  let itemsSummary = "";
+  for(const [n,q] of Object.entries(cart)){
+    const p = find(n);
+    itemsSummary += `• ${n} ${fmt(q)} ${p.u} = ${p.p*q} บาท\n`;
+  }
+  return {
+    shop: shop,
+    date: date,
+    note: note,
+    totalAmount: cartTotal(),
+    items: items,
+    itemsSummary: itemsSummary.trim()
+  };
+}
+function postOrderToSheet(){
+  if(!SHEET_WEBHOOK_URL) return;
+  try{
+    const payload = buildOrderPayload();
+    fetch(SHEET_WEBHOOK_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    }).then(()=>{
+      console.log("บันทึกออเดอร์เข้า Google Sheet เรียบร้อยแล้ว");
+    }).catch(err=>{
+      console.warn("ไม่สามารถบันทึกออเดอร์ลง Google Sheet ได้:", err);
+    });
+  }catch(e){
+    console.warn("ข้อผิดพลาด Webhook:", e);
+  }
+}
 function copyOrder(){
   if(!validateOrder()) return;
+  saveShopName(document.getElementById("shop").value);
+  postOrderToSheet();
   navigator.clipboard.writeText(orderText())
     .then(()=>toast("คัดลอกแล้ว วางส่งใน LINE ได้เลย ✓"))
     .catch(()=>toast("คัดลอกไม่สำเร็จ ลองกดค้างเลือกข้อความแทน"));
 }
 function sendLine(){
   if(!validateOrder()) return;
+  saveShopName(document.getElementById("shop").value);
+  postOrderToSheet();
   const url = "https://line.me/R/oaMessage/%40746wpose/?" + encodeURIComponent(orderText());
-  copyOrder();
+  navigator.clipboard.writeText(orderText()).catch(()=>{});
   window.open(url,"_blank");
 }
 function clearCart(){ cart={}; closeSheet(); render(); toast("ล้างตะกร้าแล้ว"); }
@@ -419,6 +485,11 @@ async function loadPrices(){
 
 /* ================= init ================= */
 (function(){
+  loadShopName();
+  const shopInput = document.getElementById("shop");
+  if(shopInput){
+    shopInput.addEventListener("input", function(){ saveShopName(this.value); });
+  }
   const d = new Date(); d.setDate(d.getDate()+1);
   const minDate = d.toISOString().slice(0,10);
   const dateInput = document.getElementById("date");
