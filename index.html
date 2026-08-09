@@ -391,7 +391,11 @@ async function initLiff(){
     await liff.init({ liffId: LIFF_ID });
     if(liff.isLoggedIn()){
       liffProfile = await liff.getProfile();
-      console.log("LIFF Profile loaded:", liffProfile.displayName);
+      console.log("LIFF Profile loaded:", liffProfile.displayName, liffProfile.userId);
+    } else {
+      if (liff.isInClient()) {
+        liff.login();
+      }
     }
   }catch(e){
     console.warn("LIFF init error:", e);
@@ -417,8 +421,8 @@ function buildOrderPayload(){
     totalAmount: cartTotal(),
     items: items,
     itemsSummary: itemsSummary.trim(),
-    lineUserId: liffProfile ? liffProfile.userId : null,
-    lineDisplayName: liffProfile ? liffProfile.displayName : null
+    lineUserId: liffProfile ? liffProfile.userId : "",
+    lineDisplayName: liffProfile ? liffProfile.displayName : ""
   };
 }
 function postOrderToSheet(){
@@ -439,31 +443,14 @@ function postOrderToSheet(){
     console.warn("ข้อผิดพลาด Webhook:", e);
   }
 }
-function fallbackSendLine(){
-  const url = "https://line.me/R/oaMessage/%40746wpose/?" + encodeURIComponent(orderText());
-  navigator.clipboard.writeText(orderText()).catch(()=>{});
-  window.open(url, "_blank");
-  closeSheet();
-  toast("ส่งออเดอร์เรียบร้อยแล้ว ✓");
-}
 function submitOrder(){
   if(!validateOrder()) return;
   saveShopName(document.getElementById("shop").value);
   postOrderToSheet();
-  if (typeof liff !== "undefined" && liff.isLoggedIn && liff.isLoggedIn() && liff.isInClient && liff.isInClient()) {
-    liff.sendMessages([{
-      type: "text",
-      text: orderText()
-    }]).then(() => {
-      closeSheet();
-      toast("ส่งออเดอร์เข้าแชท LINE เรียบร้อยแล้ว ✓");
-    }).catch((err) => {
-      console.warn("LIFF sendMessages error:", err);
-      fallbackSendLine();
-    });
-  } else {
-    fallbackSendLine();
-  }
+  cart = {};
+  closeSheet();
+  render();
+  toast("ส่งออเดอร์เรียบร้อยแล้ว ✓");
 }
 function copyOrder(){ submitOrder(); }
 function sendLine(){ submitOrder(); }

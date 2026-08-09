@@ -4,20 +4,20 @@
  * ฟีเจอร์:
  * 1. บันทึกออเดอร์ลงชีต "รายการออเดอร์" ใน Google Sheet อัตโนมัติ
  * 2. ส่งข้อความแจ้งเตือนออเดอร์ใหม่เด้งเข้า LINE แอดมินร้านค้า (LINE Messaging API / LINE Notify)
- * 3. ส่งข้อความยืนยันออเดอร์กลับเข้าแชท LINE ของลูกค้าโดยตรง (เมื่อเปิดผ่าน LINE LIFF)
+ * 3. ส่งข้อความยืนยันออเดอร์กลับเข้าแชท LINE ของลูกค้าโดยตรง (Messaging API Push Message)
  * 
  * วิธีใช้งาน:
  * 1. เปิด Google Sheet "ราคาระบบ / ตารางลูกค้า"
  * 2. ไปที่เมนู "ส่วนขยาย" (Extensions) > "Apps Script"
  * 3. วางโค้ดนี้ทั้งหมดลงในไฟล์ Code.gs
- * 4. (ไม่บังคับ) ใส่ค่า LINE_CHANNEL_ACCESS_TOKEN หรือ ADMIN_LINE_NOTIFY_TOKEN ถ้าต้องการแจ้งเตือนไลน์
- * 5. กดปุ่ม "ทำให้ใช้งานได้" (Deploy) > "จัดการการทําให้ใช้งานได้" (Manage Deployments) > แก้ไขเป็นเวอร์ชันใหม่
+ * 4. ระบุค่า LINE_CHANNEL_ACCESS_TOKEN และ ADMIN_LINE_USER_ID (LINE User ID ของแอดมิน)
+ * 5. กดปุ่ม "ทำให้ใช้งานได้" (Deploy) > "จัดการการทำให้ใช้งานได้" (Manage Deployments) > แก้ไขเป็น "เวอร์ชันใหม่" (New Version)
  */
 
-// ================= ตั้งค่า LINE (ถ้ายังไม่ใส่ สามารถเว้นว่างไว้ได้ ระบบจะบันทึกชีตได้อย่างเดียว) =================
-var LINE_CHANNEL_ACCESS_TOKEN = "/ZSNTT8339UJqvXWWQh7fLKBitoZeH7xUFj9+X92XCbewBkFXaUVx8+NZUoUiUMLzvfKu6hLux+EKGFcgtXKtYoLKRJBndcULx1g+EDXdI4NiBdTqNe4U5xEdSmlXJ8oqZrqlYpJumD5w0viHChkPAdB04t89/1O/w1cDnyilFU="; // วาง Channel Access Token จาก LINE Developers Console
-var ADMIN_LINE_NOTIFY_TOKEN = "";    // วาง LINE Notify Token ของแอดมินร้าน (ถ้ามี)
-var ADMIN_LINE_USER_ID = "";         // หรือวาง LINE User ID ของแอดมินร้าน (ถ้าใช้ Messaging API)
+// ================= ตั้งค่า LINE Messaging API / LINE Notify =================
+var LINE_CHANNEL_ACCESS_TOKEN = "/ZSNTT8339UJqvXWWQh7fLKBitoZeH7xUFj9+X92XCbewBkFXaUVx8+NZUoUiUMLzvfKu6hLux+EKGFcgtXKtYoLKRJBndcULx1g+EDXdI4NiBdTqNe4U5xEdSmlXJ8oqZrqlYpJumD5w0viHChkPAdB04t89/1O/w1cDnyilFU="; 
+var ADMIN_LINE_USER_ID = "";         // ⚠️ วาง LINE User ID ของแอดมินร้านค้าที่นี่ (เช่น U1234567890abcdef...) เพื่อรับการแจ้งเตือน
+var ADMIN_LINE_NOTIFY_TOKEN = "";    // (ไม่บังคับ) วาง LINE Notify Token ของแอดมินร้าน (ถ้าใช้ LINE Notify)
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
@@ -62,7 +62,7 @@ function doPost(e) {
     var itemsSummary = "";
     if (Array.isArray(data.items)) {
       itemsSummary = data.items.map(function(item) {
-        return item.name + " " + item.qty + " " + item.unit + " (" + item.price + "฿)";
+        return "• " + item.name + " " + item.qty + " " + item.unit + " = " + item.subtotal + " บาท";
       }).join("\n");
     } else {
       itemsSummary = data.itemsSummary || "";
@@ -91,11 +91,11 @@ function doPost(e) {
     var receiptText = "🧾 ใบสั่งซื้อ — ร้านสวนผักสด\n" +
                       "เลขที่: " + orderId + "\n" +
                       "ร้าน: " + shopName + "\n" +
-                      "รับของ: " + deliveryDate + "\n" +
+                      "วันรับของ: " + deliveryDate + "\n" +
                       "———————\n" +
                       itemsSummary + "\n" +
                       "———————\n" +
-                      "💰 รวมทั้งสิ้น: " + totalAmount.toLocaleString() + " บาท";
+                      "💰 รวมทั้งสิ้น: " + Number(totalAmount).toLocaleString("th-TH") + " บาท";
     if (note) receiptText += "\n📝 หมายเหตุ: " + note;
 
     // 2. ส่งแจ้งเตือนหาแอดมินร้านค้า (LINE Notify หรือ Messaging API Push)
@@ -107,9 +107,9 @@ function doPost(e) {
       sendLinePushMessage(LINE_CHANNEL_ACCESS_TOKEN, ADMIN_LINE_USER_ID, adminMessage);
     }
 
-    // 3. ส่งข้อความยืนยันเข้าแชท LINE ของลูกค้าโดยตรง (ถ้าส่ง lineUserId มา)
+    // 3. ส่งข้อความยืนยันเข้าแชท LINE ของลูกค้าโดยตรง (ถ้าเปิดผ่าน LIFF / มี lineUserId)
     if (LINE_CHANNEL_ACCESS_TOKEN && lineUserId) {
-      var customerMessage = "ขอบคุณที่สั่งซื้อผัก-ผลไม้กับร้านสวนผักสดค่ะ 🙏\n" + receiptText;
+      var customerMessage = "ขอบคุณที่สั่งซื้อผัก-ผลไม้กับร้านสวนผักสดค่ะ 🙏\nระบบได้รับออเดอร์เรียบร้อยแล้วค่ะ\n\n" + receiptText;
       sendLinePushMessage(LINE_CHANNEL_ACCESS_TOKEN, lineUserId, customerMessage);
     }
     
@@ -118,6 +118,7 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
       
   } catch (error) {
+    Logger.log("doPost Error: " + error.toString());
     return ContentService
       .createTextOutput(JSON.stringify({ result: "error", message: error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -132,17 +133,18 @@ function sendLineNotify(token, message) {
     UrlFetchApp.fetch("https://notify-api.line.me/api/notify", {
       method: "post",
       headers: { "Authorization": "Bearer " + token },
-      payload: { "message": message }
+      payload: { "message": message },
+      muteHttpExceptions: true
     });
   } catch (e) {
-    console.warn("LINE Notify error:", e);
+    Logger.log("LINE Notify error: " + e.toString());
   }
 }
 
 // ฟังก์ชั่นส่ง LINE Messaging API Push Message
 function sendLinePushMessage(channelToken, toUserId, messageText) {
   try {
-    UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", {
+    var response = UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", {
       method: "post",
       headers: {
         "Content-Type": "application/json",
@@ -151,10 +153,12 @@ function sendLinePushMessage(channelToken, toUserId, messageText) {
       payload: JSON.stringify({
         to: toUserId,
         messages: [{ type: "text", text: messageText }]
-      })
+      }),
+      muteHttpExceptions: true
     });
+    Logger.log("LINE Push (" + toUserId + ") Response: " + response.getResponseCode() + " " + response.getContentText());
   } catch (e) {
-    console.warn("LINE Push error:", e);
+    Logger.log("LINE Push error: " + e.toString());
   }
 }
 
