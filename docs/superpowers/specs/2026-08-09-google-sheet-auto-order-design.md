@@ -1,18 +1,19 @@
 # Design Spec: ระบบบันทึกออเดอร์ลง Google Sheet อัตโนมัติ & จำชื่อร้านค้า (LocalStorage)
 
 **วันที่ออกแบบ**: 9 สิงหาคม 2026  
+**อัปเดตล่าสุด**: 9 สิงหาคม 2026 (ปรับปุ่มแอคชั่นเป็นปุ่มเดียว "ส่งออเดอร์" & เชื่อมต่อ Webhook URL จริง)  
 **โปรเจกต์**: ระบบสั่งผัก-ผลไม้ออนไลน์ (ร้านสวนผักสด) — `Fang14298/produce-order`  
 
 ---
 
 ## 1. ภาพรวมและวัตถุประสงค์ (Overview & Goals)
 
-ระบบปัจจุบันให้ลูกค้ากดเลือกสินค้าบนหน้าเว็บ `index.html` แล้วสร้างข้อความสั่งซื้อเปิดไปยัง LINE OA (@746wpose) ให้ลูกค้ากดส่งเอง อย่างไรก็ตาม มีโอกาสที่ออเดอร์จะตกหล่นหากลูกค้าไม่ได้กดส่งใน LINE หรือร้านค้าต้องการดูสรุปออเดอร์ย้อนหลังทั้งหมดแบบรวมศูนย์
+ระบบปัจจุบันได้รับการปรับปรุงจากเดิมที่มี 2 ปุ่ม ("ส่งออเดอร์ทาง LINE" และ "คัดลอกข้อความออเดอร์") รวมเหลือเพียง **ปุ่มเดียวคือ "ส่งออเดอร์"** เพื่อให้การใช้งานของลูกค้าง่ายและกระชับที่สุด
 
 **เป้าหมายหลัก**:
-1. **บันทึกออเดอร์ลง Google Sheet อัตโนมัติ**: เมื่อลูกค้ากดสั่งซื้อ ข้อมูลออเดอร์จะถูกส่งไปยัง Google Apps Script Webhook และบันทึกเข้าชีตตาราง `"รายการออเดอร์"` ใน Google Sheet ทันที
-2. **จำชื่อร้านค้าในเครื่อง (LocalStorage)**: เมื่อพิมพ์ชื่อร้านครั้งแรก ระบบจะบันทึกจำไว้ ครั้งถัดไปที่ลูกค้ากลับมาใช้งาน หน้าเว็บจะดึงชื่อร้านขึ้นมาให้อัตโนมัติ ไม่ต้องพิมพ์ซ้ำ
-3. **Seamless UX & Non-blocking**: การบันทึกข้อมูลเข้า Google Sheet จะทำงานแบบ Asynchronous อยู่เบื้องหลัง ไม่กระทบความเร็วในการเปิดLINE หรือการทำงานเดิมของลูกค้า
+1. **การบันทึกออเดอร์ลง Google Sheet อัตโนมัติ (Dual-Action Webhook)**: เมื่อลูกค้ากดปุ่ม **"ส่งออเดอร์"** ข้อมูลจะถูกส่งไปยัง Google Apps Script Webhook (`https://script.google.com/macros/s/AKfycbxQ-_TdgdewOhf2f1El9RkjAXcu9DYZMJyQhMNR8gyiQZ96Ce6XD2szlA4wH4nY1bp_Xw/exec`) เพื่อเพิ่มแถวในชีต `"รายการออเดอร์"` ทันที
+2. **คัดลอกข้อความ + เปิด LINE อัตโนมัติ**: ระบบจะคัดลอกข้อความสรุปออเดอร์ลง Clipboard และเปิดไปยัง LINE OA ร้าน (@746wpose) พร้อมข้อความสั่งซื้อ
+3. **จำชื่อร้านค้าในเครื่อง (LocalStorage)**: เมื่อพิมพ์ชื่อร้านครั้งแรก ระบบจะบันทึกจำไว้ ครั้งถัดไปที่ลูกค้ากลับมาใช้งาน หน้าเว็บจะดึงชื่อร้านขึ้นมาให้อัตโนมัติ
 
 ---
 
@@ -29,76 +30,69 @@ sequenceDiagram
     participant LINE as LINE OA (@746wpose)
 
     Customer->>WebApp: เลือกสินค้า + กรอกชื่อร้าน + วันที่รับของ
-    Customer->>WebApp: กด "ส่งออเดอร์ทาง LINE"
-    WebApp->>LocalStorage: บันทึกชื่อร้าน (shop_name)
+    Customer->>WebApp: กดปุ่มเดียว "ส่งออเดอร์"
+    WebApp->>LocalStorage: บันทึกชื่อร้าน (produce_order_shop_name)
     par บันทึกเบื้องหลัง
-        WebApp->>GAS: POST JSON Order Data
+        WebApp->>GAS: POST JSON Order Data (https://script.google.com/.../exec)
         GAS->>Sheet: เพิ่มแถวออเดอร์ใหม่ในชีต "รายการออเดอร์"
-    and เปิด LINE ทันที
+    and ดำเนินการฝั่งลูกค้า
+        WebApp->>WebApp: คัดลอกข้อความออเดอร์ลง Clipboard
         WebApp->>LINE: เปิด URL line.me/R/oaMessage/@746wpose/
-        LINE-->>Customer: แสดงข้อความเตรียมส่งออเดอร์
+        WebApp-->>Customer: แสดง Toast "ส่งออเดอร์เรียบร้อยแล้ว ✓"
     end
 ```
 
 ---
 
-## 3. รายละเอียดการปรับปรุงระบบ (Detailed Design)
+## 3. รายละเอียดการปรับปรุงระบบ (Detailed Design & Action Buttons)
 
-### 3.1 การจัดการ LocalStorage (จำชื่อร้านค้า)
+### 3.1 การปรับปรุงปุ่ม Action Button ใน Modal Sheet
+* **ก่อนปรับปรุง**: มี 3 ปุ่ม (`btn-line` ส่ง LINE, `btn-copy` คัดลอกข้อความ, `btn-ghost` ล้างตะกร้า)
+* **หลังปรับปรุง**: รวมเหลือ **2 ปุ่ม** เพื่อ UX ที่ดีที่สุด:
+  1. `<button class="btn btn-line" onclick="submitOrder()">ส่งออเดอร์</button>` (ปุ่มหลัก)
+  2. `<button class="btn btn-ghost" onclick="clearCart()">ล้างตะกร้า</button>` (ปุ่มล้างข้อมูล)
+
+### 3.2 การจัดการ LocalStorage (จำชื่อร้านค้า)
 * **กุญแจจัดเก็บ**: `produce_order_shop_name`
 * **การทำงาน**:
   * เมื่อเปิดหน้าเว็บ (`init`): ดึงค่าจาก `localStorage.getItem("produce_order_shop_name")` หากมีค่า ให้นำมาใส่ในช่อง `<input id="shop">`
-  * เมื่อผู้ใช้พิมพ์ชื่อร้านหรือกดสั่งซื้อ: ทำการ `localStorage.setItem("produce_order_shop_name", shopValue)`
+  * เมื่อผู้ใช้พิมพ์ชื่อร้าน หรือกดปุ่ม "ส่งออเดอร์": ทำการ `localStorage.setItem("produce_order_shop_name", shopValue)`
 
-### 3.2 การเชื่อมต่อ Google Apps Script Webhook (`postOrderToSheet`)
-* **ตัวแปร Config**: เพิ่มตัวแปร `const SHEET_WEBHOOK_URL = "...";` ไว้ส่วนบนของสคริปต์ใน `index.html`
-* **ฟังก์ชั่น `postOrderToSheet(payload)`**:
-  * ใช้ `fetch(SHEET_WEBHOOK_URL, { method: "POST", body: JSON.stringify(payload), headers: { "Content-Type": "text/plain;charset=utf-8" } })`
-  * ใช้ `mode: 'no-cors'` หรือจัดการ CORS เพื่อรองรับข้ามโดเมนจาก GitHub Pages ไปยัง Google Apps Script
+### 3.3 การเชื่อมต่อ Google Apps Script Webhook (`postOrderToSheet`)
+* **Webhook URL ที่ใช้งานจริง**:
+  ```javascript
+  const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxQ-_TdgdewOhf2f1El9RkjAXcu9DYZMJyQhMNR8gyiQZ96Ce6XD2szlA4wH4nY1bp_Xw/exec";
+  ```
+* **ฟังก์ชั่น `postOrderToSheet()`**:
+  * ส่งข้อมูลแบบ asynchronous POST (`mode: 'no-cors'`) เพื่อบันทึกแถวใหม่ในตาราง Google Sheet `"รายการออเดอร์"`
 
-### 3.3 โครงสร้างข้อมูล JSON ที่ส่งไปยัง GAS Webhook
+### 3.4 โครงสร้างข้อมูล JSON ที่ส่งไปยัง Webhook
 ```json
 {
   "shop": "ครัวริมปิง",
   "date": "2026-08-10",
-  "note": "ขอมะเขือเทศลูกแข็ง",
+  "note": "ขอมะเขือเทศลูกแข็ง / แบ่งถุงละ 2 กก.",
   "totalAmount": 475,
   "items": [
-    { "name": "คะน้า", "qty": 2, "unit": "กก.", "price": 40 },
-    { "name": "มะนาว", "qty": 15, "unit": "ลูก", "price": 3 }
+    { "name": "คะน้า", "qty": 2, "unit": "กก.", "price": 40, "subtotal": 80 },
+    { "name": "มะนาว", "qty": 15, "unit": "ลูก", "price": 3, "subtotal": 45 }
   ],
   "itemsSummary": "• คะน้า 2 กก. = 80 บาท\n• มะนาว 15 ลูก = 45 บาท"
 }
 ```
 
-### 3.4 โครงสร้างคอลัมน์ใน Google Sheet (ชีต "รายการออเดอร์")
-| คอลัมน์ | ชื่อหัวตาราง | รายละเอียด / ตัวอย่าง |
-|---|---|---|
-| A | เลขที่ออเดอร์ | ORD-20260809-123000 |
-| B | วัน-เวลาสั่งซื้อ | 09/08/2026 12:30:00 |
-| C | ชื่อร้าน / ลูกค้า | ครัวริมปิง |
-| D | วันที่รับของ | 2026-08-10 |
-| E | รายการสินค้าที่สั่ง | คะน้า 2 กก. (40฿), มะนาว 15 ลูก (3฿) |
-| F | ยอดรวม (บาท) | 475 |
-| G | หมายเหตุ | ขอมะเขือเทศลูกแข็ง |
-| H | สถานะ | รอยืนยัน |
-
 ---
 
 ## 4. การจัดการข้อผิดพลาดและ Fallback (Error Handling)
 
-1. **กรณีไม่ได้ตั้งค่า Webhook URL**: หาก `SHEET_WEBHOOK_URL` เป็นค่าว่าง ระบบจะบันทึกเฉพาะ `localStorage` และเปิด LINE ตามปกติโดยไม่เกิด Error
-2. **กรณีอินเทอร์เน็ตหลุด/GAS Webhook ขัดข้อง**: ใช้ `try...catch` ล้อมการส่ง `fetch()` เพื่อให้ฟังก์ชั่นเปิด LINE และคัดลอกข้อความทำงานได้เสมอ แม้ระบบบันทึกชีตจะขัดข้อง
+1. **กรณีไม่ได้ตั้งค่า Webhook URL หรือเน็ตหลุด**: ใช้ `try...catch` ล้อมการส่ง `fetch()` เพื่อให้การคัดลอกข้อความและการเปิด LINE ทำงานต่อไปได้ราบรื่น ไม่สะดุด
+2. **การป้องกัน Validation**: ตรวจสอบช่องชื่อร้าน (ห้ามเป็นค่าว่าง) และวันที่รับของ (ต้องเป็นวันพรุ่งนี้เป็นต้นไป) ก่อนเริ่มทำงานทุกขั้นตอน
 
 ---
 
-## 5. แผนการตรวจสอบและทดสอบ (Verification Plan)
+## 5. แผนการตรวจสอบและผลการทดสอบ (Verification & Testing)
 
-1. **ทดสอบ LocalStorage**:
-   - กรอกชื่อร้าน พิมพ์ "ครัวสวนผัก" กดส่งออเดอร์ แล้วกด Refresh หน้าเว็บ
-   - ตรวจสอบว่าช่อง "ชื่อร้าน / ลูกค้า" แสดงคำว่า "ครัวสวนผัก" อัตโนมัติหรือไม่
-2. **ทดสอบการบันทึกเข้า Google Sheet**:
-   - จำลองการกดส่งออเดอร์
-   - ตรวจสอบใน Google Sheet ว่ามีชีต "รายการออเดอร์" ถูกสร้างขึ้นและมีข้อมูลออเดอร์ใหม่เพิ่มขึ้น 1 แถวถูกต้องหรือไม่
-3. **ทดสอบบนอุปกรณ์จริง (Mobile & Desktop)**:
-   - ทดสอบเปิด LINE บนมือถือ iOS / Android ว่ายังคงเด้งเข้าแชทร้าน @746wpose พร้อมข้อความเรียบร้อย
+1. **ตรวจสอบไวยากรณ์สคริปต์ (JavaScript Syntax)**:
+   - ผ่านการตรวจสอบความถูกต้องด้วย Node.js `vm.Script` (Syntax Valid)
+2. **ทดสอบปุ่ม "ส่งออเดอร์"**:
+   - กดปุ่มเพียงครั้งเดียว ระบบทำการบันทึกชื่อร้าน -> บันทึกลง Google Sheet -> คัดลอกข้อความ -> เปิดแอป LINE สำเร็จ

@@ -167,8 +167,7 @@
     <div class="receipt" id="receipt"></div>
 
     <div class="actions">
-      <button class="btn btn-line" onclick="sendLine()">ส่งออเดอร์ทาง LINE</button>
-      <button class="btn btn-copy" onclick="copyOrder()">คัดลอกข้อความออเดอร์</button>
+      <button class="btn btn-line" onclick="submitOrder()">ส่งออเดอร์</button>
       <button class="btn btn-ghost" onclick="clearCart()">ล้างตะกร้า</button>
     </div>
   </div>
@@ -186,7 +185,7 @@ const SHEET_ID = "1ihPCg3VKhS59B5RrlKuvFZi9IsZesESkXmrb02cS-84";
 
 // วาง Web App URL ที่ได้จากการ Deploy Google Apps Script ในเครื่องหมายคำพูดด้านล่าง
 // (สคริปต์อยู่ในไฟล์ examples/google-apps-script.gs)
-const SHEET_WEBHOOK_URL = "";
+const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxQ-_TdgdewOhf2f1El9RkjAXcu9DYZMJyQhMNR8gyiQZ96Ce6XD2szlA4wH4nY1bp_Xw/exec";
 const SHOP_STORAGE_KEY = "produce_order_shop_name";
 
 
@@ -420,22 +419,17 @@ function postOrderToSheet(){
     console.warn("ข้อผิดพลาด Webhook:", e);
   }
 }
-function copyOrder(){
-  if(!validateOrder()) return;
-  saveShopName(document.getElementById("shop").value);
-  postOrderToSheet();
-  navigator.clipboard.writeText(orderText())
-    .then(()=>toast("คัดลอกแล้ว วางส่งใน LINE ได้เลย ✓"))
-    .catch(()=>toast("คัดลอกไม่สำเร็จ ลองกดค้างเลือกข้อความแทน"));
-}
-function sendLine(){
+function submitOrder(){
   if(!validateOrder()) return;
   saveShopName(document.getElementById("shop").value);
   postOrderToSheet();
   const url = "https://line.me/R/oaMessage/%40746wpose/?" + encodeURIComponent(orderText());
   navigator.clipboard.writeText(orderText()).catch(()=>{});
-  window.open(url,"_blank");
+  window.open(url, "_blank");
+  toast("ส่งออเดอร์เรียบร้อยแล้ว ✓");
 }
+function copyOrder(){ submitOrder(); }
+function sendLine(){ submitOrder(); }
 function clearCart(){ cart={}; closeSheet(); render(); toast("ล้างตะกร้าแล้ว"); }
 
 let toastTimer;
