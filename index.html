@@ -6,6 +6,7 @@
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#1E6B3C">
 <title>สั่งผัก-ผลไม้ | ร้านสวนผักสด</title>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -187,6 +188,11 @@ const SHEET_ID = "1ihPCg3VKhS59B5RrlKuvFZi9IsZesESkXmrb02cS-84";
 // (สคริปต์อยู่ในไฟล์ examples/google-apps-script.gs)
 const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxQ-_TdgdewOhf2f1El9RkjAXcu9DYZMJyQhMNR8gyiQZ96Ce6XD2szlA4wH4nY1bp_Xw/exec";
 const SHOP_STORAGE_KEY = "produce_order_shop_name";
+
+// วาง LIFF ID ที่ได้จาก LINE Developers Console (เช่น "2000000000-AbCdEfGh")
+const LIFF_ID = "";
+let liffProfile = null;
+
 
 
 /* ================= data (ใช้เมื่อยังไม่เชื่อมชีท หรือโหลดชีทไม่สำเร็จ) ================= */
@@ -379,6 +385,18 @@ function saveShopName(val){
     }
   }catch(e){}
 }
+async function initLiff(){
+  if(!LIFF_ID || typeof liff === "undefined") return;
+  try{
+    await liff.init({ liffId: LIFF_ID });
+    if(liff.isLoggedIn()){
+      liffProfile = await liff.getProfile();
+      console.log("LIFF Profile loaded:", liffProfile.displayName);
+    }
+  }catch(e){
+    console.warn("LIFF init error:", e);
+  }
+}
 function buildOrderPayload(){
   const shop = document.getElementById("shop").value.trim() || "(ไม่ระบุชื่อร้าน)";
   const date = document.getElementById("date").value || "พรุ่งนี้";
@@ -398,7 +416,9 @@ function buildOrderPayload(){
     note: note,
     totalAmount: cartTotal(),
     items: items,
-    itemsSummary: itemsSummary.trim()
+    itemsSummary: itemsSummary.trim(),
+    lineUserId: liffProfile ? liffProfile.userId : null,
+    lineDisplayName: liffProfile ? liffProfile.displayName : null
   };
 }
 function postOrderToSheet(){
@@ -419,14 +439,31 @@ function postOrderToSheet(){
     console.warn("ข้อผิดพลาด Webhook:", e);
   }
 }
+function fallbackSendLine(){
+  const url = "https://line.me/R/oaMessage/%40746wpose/?" + encodeURIComponent(orderText());
+  navigator.clipboard.writeText(orderText()).catch(()=>{});
+  window.open(url, "_blank");
+  closeSheet();
+  toast("ส่งออเดอร์เรียบร้อยแล้ว ✓");
+}
 function submitOrder(){
   if(!validateOrder()) return;
   saveShopName(document.getElementById("shop").value);
   postOrderToSheet();
-  const url = "https://line.me/R/oaMessage/%40746wpose/?" + encodeURIComponent(orderText());
-  navigator.clipboard.writeText(orderText()).catch(()=>{});
-  window.open(url, "_blank");
-  toast("ส่งออเดอร์เรียบร้อยแล้ว ✓");
+  if (typeof liff !== "undefined" && liff.isLoggedIn && liff.isLoggedIn() && liff.isInClient && liff.isInClient()) {
+    liff.sendMessages([{
+      type: "text",
+      text: orderText()
+    }]).then(() => {
+      closeSheet();
+      toast("ส่งออเดอร์เข้าแชท LINE เรียบร้อยแล้ว ✓");
+    }).catch((err) => {
+      console.warn("LIFF sendMessages error:", err);
+      fallbackSendLine();
+    });
+  } else {
+    fallbackSendLine();
+  }
 }
 function copyOrder(){ submitOrder(); }
 function sendLine(){ submitOrder(); }
@@ -480,6 +517,7 @@ async function loadPrices(){
 /* ================= init ================= */
 (function(){
   loadShopName();
+  initLiff();
   const shopInput = document.getElementById("shop");
   if(shopInput){
     shopInput.addEventListener("input", function(){ saveShopName(this.value); });
