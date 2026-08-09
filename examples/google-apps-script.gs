@@ -15,7 +15,7 @@
  */
 
 // ================= ตั้งค่า LINE (ถ้ายังไม่ใส่ สามารถเว้นว่างไว้ได้ ระบบจะบันทึกชีตได้อย่างเดียว) =================
-var LINE_CHANNEL_ACCESS_TOKEN = ""; // วาง Channel Access Token จาก LINE Developers Console
+var LINE_CHANNEL_ACCESS_TOKEN = "/ZSNTT8339UJqvXWWQh7fLKBitoZeH7xUFj9+X92XCbewBkFXaUVx8+NZUoUiUMLzvfKu6hLux+EKGFcgtXKtYoLKRJBndcULx1g+EDXdI4NiBdTqNe4U5xEdSmlXJ8oqZrqlYpJumD5w0viHChkPAdB04t89/1O/w1cDnyilFU="; // วาง Channel Access Token จาก LINE Developers Console
 var ADMIN_LINE_NOTIFY_TOKEN = "";    // วาง LINE Notify Token ของแอดมินร้าน (ถ้ามี)
 var ADMIN_LINE_USER_ID = "";         // หรือวาง LINE User ID ของแอดมินร้าน (ถ้าใช้ Messaging API)
 

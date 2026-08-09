@@ -1,7 +1,7 @@
 # Design Spec: ระบบบันทึกออเดอร์ Google Sheet & LINE LIFF + Messaging API
 
 **วันที่ออกแบบ**: 9 สิงหาคม 2026  
-**อัปเดตล่าสุด**: 9 สิงหาคม 2026 (เพิ่มสเปก LINE LIFF ID + Messaging API Push Notification ครบวงจร)  
+**อัปเดตล่าสุด**: 9 สิงหาคม 2026 (เชื่อมต่อ LIFF ID: `2011037440-PBPwdRGn` และ Channel Access Token จริงแล้ว)  
 **โปรเจกต์**: ระบบสั่งผัก-ผลไม้ออนไลน์ (ร้านสวนผักสด) — `Fang14298/produce-order`  
 
 ---
@@ -11,7 +11,7 @@
 ยกระดับประสบการณ์การสั่งซื้อสินค้าให้เทียบเท่าแอปพลิเคชันระดับมืออาชีพ ด้วยการเชื่อมต่อ **LINE LIFF (LINE Front-end Framework)** และ **LINE Messaging API / LINE Notify**
 
 **เป้าหมายหลัก**:
-1. **อัตโนมัติ 100% สำหรับลูกค้า (LINE LIFF)**: เมื่อเปิดหน้าเว็บผ่าน LINE ระบบจะระบุตัวตนของลูกค้า (`lineUserId`, `lineDisplayName`) อัตโนมัติ เมื่อกดสั่งซื้อ ระบบสามารถส่งข้อความสั่งซื้อเข้าแชท LINE ของลูกค้าโดยตรงโดยลูกค้าไม่ต้องกดส่งซ้ำ
+1. **อัตโนมัติ 100% สำหรับลูกค้า (LINE LIFF)**: เมื่อเปิดหน้าเว็บผ่าน LINE ระบบจะระบุตัวตนของลูกค้า (`lineUserId`, `lineDisplayName`) อัตโนมัติ เมื่อกดสั่งซื้อ ระบบส่งข้อความสั่งซื้อเข้าแชท LINE ของลูกค้าโดยตรงโดยลูกค้าไม่ต้องกดส่งซ้ำ
 2. **การแจ้งเตือนเสียงเด้งเข้า LINE แอดมินร้าน (Admin Alert)**: ทันทีที่มีออเดอร์ใหม่ลง Google Sheet ระบบจะยิงข้อความสรุปออเดอร์เด้งเตือนใน LINE ของร้านค้า/กลุ่มแอดมินทันที 24 ชม.
 3. **บันทึกตารางรวมศูนย์ (Google Sheet)**: บันทึกข้อมูลออเดอร์ครบถ้วนลงตาราง `"รายการออเดอร์"` ใน Google Sheet พร้อมบันทึก `LINE User ID` สำหรับติดต่อกลับ
 4. **จำชื่อร้านค้าในเครื่อง (LocalStorage)**: จำชื่อร้านในโทรศัพท์ลูกค้า ไม่ต้องนั่งพิมพ์ใหม่ทุกครั้ง
@@ -30,7 +30,7 @@ sequenceDiagram
     participant AdminLine as LINE ร้านค้า / แอดมิน
     participant CustomerLine as แชท LINE ของลูกค้า
 
-    Customer->>LIFF: เปิดหน้าเว็บสั่งซื้อใน LINE
+    Customer->>LIFF: เปิดหน้าเว็บสั่งซื้อใน LINE (LIFF ID Active)
     LIFF-->>LIFF: ดึงข้อมูลโปรไฟล์ (lineUserId, displayName)
     Customer->>LIFF: เลือกผัก + กดปุ่ม "ส่งออเดอร์"
     par 1. บันทึกลง Sheet & แจ้งเตือนแอดมิน
@@ -46,31 +46,19 @@ sequenceDiagram
 
 ---
 
-## 3. วิธีการตั้งค่า LINE LIFF และ Messaging API (Step-by-Step Guide)
+## 3. รายละเอียดคอนฟิกที่ตั้งค่าแล้ว (Active Configurations)
 
-### 3.1 ขั้นตอนขอ LIFF ID (เพื่อให้แชทลูกค้าได้รับข้อความทวนออเดอร์)
-1. เข้าสู่ระบบ [LINE Developers Console](https://developers.line.biz/)
-2. เลือก Provider ของร้านค้า หรือสร้างใหม่ -> เลือก **Provider: ร้านสวนผักสด**
-3. สร้าง Channel ใหม่ประเภท **LINE Login**
-4. ไปที่แท็บ **LIFF** -> กดปุ่ม **Add**
-   - **LIFF app name**: สั่งผักสวนผักสด
-   - **Size**: Full
-   - **Endpoint URL**: `https://fang14298.github.io/produce-order/`
-   - **Scopes**: เลือก `profile`, `openid`
-   - **Bot prompt**: Aggressive หรือ Normal
-5. กด **Add** แล้วคัดลอก **LIFF ID** (เช่น `2000123456-AbCdEfGh`) นำมาวางในตัวแปร `LIFF_ID` ในไฟล์ [`index.html`](file:///C:/Users/fang0/produce-order/index.html):
-   ```javascript
-   const LIFF_ID = "2000123456-AbCdEfGh";
-   ```
+### 3.1 คอนฟิกในหน้าเว็บ ([`index.html`](file:///C:/Users/fang0/produce-order/index.html))
+```javascript
+const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxQ-_TdgdewOhf2f1El9RkjAXcu9DYZMJyQhMNR8gyiQZ96Ce6XD2szlA4wH4nY1bp_Xw/exec";
+const SHOP_STORAGE_KEY = "produce_order_shop_name";
+const LIFF_ID = "2011037440-PBPwdRGn";
+```
 
-### 3.2 ขั้นตอนขอ Channel Access Token (เพื่อให้ระบบยิงเด้งเตือนแอดมิน)
-1. ใน [LINE Developers Console](https://developers.line.biz/) เลือก Channel ประเภท **Messaging API** (ของ LINE OA @746wpose)
-2. ไปที่แท็บ **Messaging API** -> เลื่อนลงด้านล่างสุดที่ **Channel access token (long-lived)** -> กด **Issue**
-3. คัดลอก Token ยาวๆ นำไปวางในไฟล์ [`examples/google-apps-script.gs`](file:///C:/Users/fang0/produce-order/examples/google-apps-script.gs):
-   ```javascript
-   var LINE_CHANNEL_ACCESS_TOKEN = "วาง_TOKEN_ยาวๆ_ที่นี่";
-   ```
-4. หากต้องการแจ้งเตือนเข้า LINE Notify ของร้าน สามารถนำ **LINE Notify Token** มาวางใน `ADMIN_LINE_NOTIFY_TOKEN` ได้เช่นกัน
+### 3.2 คอนฟิกใน Google Apps Script ([`examples/google-apps-script.gs`](file:///C:/Users/fang0/produce-order/examples/google-apps-script.gs))
+```javascript
+var LINE_CHANNEL_ACCESS_TOKEN = "/ZSNTT8339UJqvXWWQh7fLKBitoZeH7xUFj9+X92XCbewBkFXaUVx8+NZUoUiUMLzvfKu6hLux+EKGFcgtXKtYoLKRJBndcULx1g+EDXdI4NiBdTqNe4U5xEdSmlXJ8oqZrqlYpJumD5w0viHChkPAdB04t89/1O/w1cDnyilFU=";
+```
 
 ---
 
@@ -99,4 +87,4 @@ sequenceDiagram
 1. **ตรวจสอบความถูกต้องของไวยากรณ์ JavaScript ใน `index.html`**:
    - ผ่านการตรวจสอบความถูกต้องด้วย Node.js `vm.Script` (Syntax Valid 100%)
 2. **การรองรับ Fallback**:
-   - หากยังไม่ได้ใส่ `LIFF_ID` หรือเปิดผ่านเบราว์เซอร์ปกติภายนอก LINE หน้าเว็บจะสลับไปใช้ระบบส่งข้อความมาตรฐาน (`line.me/R/oaMessage/...`) อัตโนมัติ โดยไม่พังและไม่แสดง Error
+   - หากเปิดผ่านเบราว์เซอร์ปกติภายนอก LINE หน้าเว็บจะสลับไปใช้ระบบส่งข้อความมาตรฐาน (`line.me/R/oaMessage/...`) อัตโนมัติ โดยไม่พังและไม่แสดง Error
