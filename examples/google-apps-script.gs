@@ -90,7 +90,7 @@ function doPost(e) {
     // ข้อความสรุปออเดอร์สำหรับแจ้งเตือน
     var receiptText = "🧾 ใบสั่งซื้อ — ร้านสวนผักสด\n" +
                       "เลขที่: " + orderId + "\n" +
-                      "ร้าน: " + shopName + "\n" +
+                      "ชื่อลูกค้า: " + shopName + "\n" +
                       "วันรับของ: " + deliveryDate + "\n" +
                       "———————\n" +
                       itemsSummary + "\n" +
