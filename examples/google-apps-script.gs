@@ -285,13 +285,15 @@ function testOnEditStatus() {
     Logger.log("⚠️ กรุณาระบุ ADMIN_LINE_USER_ID ก่อนทดสอบ");
     return;
   }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss ? ss.getSheetByName("รายการออเดอร์") : null;
+  if (!sheet) {
+    Logger.log("⚠️ ไม่พบชีต 'รายการออเดอร์' ในไฟล์นี้ (โปรดสร้างชีตหรือส่งออเดอร์แรกก่อน)");
+    return;
+  }
   var mockEvent = {
     range: {
-      getSheet: function() {
-        return {
-          getName: function() { return "รายการออเดอร์"; }
-        };
-      },
+      getSheet: function() { return sheet; },
       getRow: function() { return 2; },
       getColumn: function() { return 10; }
     },
