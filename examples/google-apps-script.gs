@@ -88,8 +88,8 @@ function doPost(e) {
     var note = data.note || "";
     var lineUserId = data.lineUserId || "";
     
-    // 1. บันทึกลง Google Sheet
-    sheet.appendRow([
+    // 1. บันทึกลง Google Sheet (แทรกบรรทัดใหม่ไว้ด้านบนสุด แถวที่ 2 ต่อจากหัวตาราง)
+    var newRowData = [
       orderId,
       formattedTime,
       shopName,
@@ -101,7 +101,9 @@ function doPost(e) {
       note,
       "รอยืนยัน",
       lineUserId
-    ]);
+    ];
+    sheet.insertRowBefore(2);
+    sheet.getRange(2, 1, 1, newRowData.length).setValues([newRowData]);
     
     // ข้อความสรุปออเดอร์สำหรับแจ้งเตือน
     var receiptText = "🧾 ใบสั่งซื้อ — ร้านสวนผักสด\n" +
