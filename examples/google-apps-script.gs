@@ -233,13 +233,17 @@ function onEditStatus(e) {
     var oldStatus = String(e.oldValue || "").trim();
     if (!newStatus || newStatus === oldStatus) return;
     
-    // อ่านข้อมูลทั้งแถว [orderId, formattedTime, shopName, address, taxId, deliveryDate, itemsSummary, totalAmount, note, status, lineUserId]
-    var rowValues = sheet.getRange(row, 1, 1, 11).getValues()[0];
+    // อ่านข้อมูลทั้งแถวแบบแสดงผล [orderId, formattedTime, shopName, address, taxId, deliveryDate, itemsSummary, totalAmount, note, status, lineUserId]
+    var displayValues = sheet.getRange(row, 1, 1, 11).getDisplayValues()[0];
+    var rawValues = sheet.getRange(row, 1, 1, 11).getValues()[0];
     
-    var orderId = rowValues[0];
-    var shopName = rowValues[2] || "ลูกค้า";
-    var deliveryDate = rowValues[5] || "พรุ่งนี้";
-    var lineUserId = rowValues[10];
+    var orderId = displayValues[0] || rawValues[0];
+    var shopName = displayValues[2] || "ลูกค้า";
+    var deliveryDate = displayValues[5] || rawValues[5];
+    if (Object.prototype.toString.call(deliveryDate) === '[object Date]') {
+      deliveryDate = Utilities.formatDate(deliveryDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    }
+    var lineUserId = String(displayValues[10] || rawValues[10]).trim();
     
     if (!lineUserId) {
       Logger.log("ไม่มี LINE User ID ในแถวที่ " + row + " — ข้ามการยิงแจ้งเตือน");
