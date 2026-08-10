@@ -239,10 +239,8 @@ function onEditStatus(e) {
     
     var orderId = displayValues[0] || rawValues[0];
     var shopName = displayValues[2] || "ลูกค้า";
-    var deliveryDate = displayValues[5] || rawValues[5];
-    if (Object.prototype.toString.call(deliveryDate) === '[object Date]') {
-      deliveryDate = Utilities.formatDate(deliveryDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
-    }
+    var rawDate = displayValues[5] || rawValues[5];
+    var deliveryDate = cleanDateText(rawDate);
     var lineUserId = String(displayValues[10] || rawValues[10]).trim();
     
     if (!lineUserId) {
@@ -305,4 +303,20 @@ function testOnEditStatus() {
     oldValue: "รอยืนยัน"
   };
   onEditStatus(mockEvent);
+}
+
+// ฟังก์ชั่นจัดการจัดรูปแบบข้อความวันที่ให้อ่านง่าย (แปลง Tue Aug 11 2026... ให้เป็น 2026-08-11)
+function cleanDateText(val) {
+  if (!val) return "พรุ่งนี้";
+  var str = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+    return str;
+  }
+  try {
+    var d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return Utilities.formatDate(d, "GMT+7", "yyyy-MM-dd");
+    }
+  } catch (e) {}
+  return str;
 }
