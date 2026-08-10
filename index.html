@@ -962,8 +962,29 @@
       document.getElementById("cartTotal").textContent = money(cartTotal());
     }
 
+    /* ================= date helpers ================= */
+    function getTomorrowLocalDateString() {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function updateDateInputLimits() {
+      const dateInput = document.getElementById("date");
+      if (!dateInput) return;
+      const tomorrowStr = getTomorrowLocalDateString();
+      dateInput.min = tomorrowStr;
+      if (!dateInput.value || dateInput.value < tomorrowStr) {
+        dateInput.value = tomorrowStr;
+      }
+    }
+
     /* ================= sheet ================= */
     function openSheet() {
+      updateDateInputLimits();
       renderReceipt();
       document.getElementById("overlay").classList.add("show");
       document.getElementById("sheet").classList.add("show");
@@ -1191,19 +1212,19 @@
         const el = document.getElementById(id);
         if (el) el.addEventListener("input", saveSavedFields);
       });
-      const d = new Date(); d.setDate(d.getDate() + 1);
-      const minDate = d.toISOString().slice(0, 10);
+      updateDateInputLimits();
       const dateInput = document.getElementById("date");
-      dateInput.value = minDate;
-      dateInput.min = minDate; // ห้ามเลือกวันนี้หรือย้อนหลัง เลือกได้ตั้งแต่พรุ่งนี้เป็นต้นไป
-      // มือถือบางรุ่น (โดยเฉพาะ iOS Safari) ไม่ทำให้วันที่ต้องห้ามเป็นสีจางในปฏิทิน
-      // จึงต้องดักแก้ตอนเลือกเสร็จ (change) อีกชั้น เผื่อผู้ใช้กดวันที่ผ่านมาแล้วได้
-      dateInput.addEventListener("change", function () {
-        if (this.value && this.value < this.min) {
-          toast("เลือกได้ตั้งแต่พรุ่งนี้เป็นต้นไปนะคะ ปรับให้แล้วค่ะ");
-          this.value = this.min;
-        }
-      });
+      if (dateInput) {
+        // มือถือบางรุ่น (โดยเฉพาะ iOS Safari) ไม่ทำให้วันที่ต้องห้ามเป็นสีจางในปฏิทิน
+        // จึงต้องดักแก้ตอนเลือกเสร็จ (change) อีกชั้น เผื่อผู้ใช้กดวันที่ผ่านมาแล้วได้
+        dateInput.addEventListener("change", function () {
+          const tomorrowStr = getTomorrowLocalDateString();
+          if (this.value && this.value < tomorrowStr) {
+            toast("เลือกได้ตั้งแต่พรุ่งนี้เป็นต้นไปนะคะ ปรับให้แล้วค่ะ");
+            this.value = tomorrowStr;
+          }
+        });
+      }
       renderChips(); render();
       loadPrices();
     })();
