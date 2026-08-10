@@ -112,13 +112,21 @@
       border-bottom: 1px solid var(--line)
     }
 
+    .search-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
     .search {
       display: flex;
       align-items: center;
       background: var(--card);
       border: 1.5px solid var(--line);
       border-radius: 11px;
-      padding: 0 12px
+      padding: 0 12px;
+      flex: 1;
+      position: relative;
     }
 
     .search:focus-within {
@@ -136,18 +144,63 @@
       background: none;
       font-family: var(--font-body);
       font-size: 16px;
-      padding: 11px 10px;
+      padding: 11px 8px;
       flex: 1;
       width: auto;
       min-width: 0
     }
 
+    .search-clear {
+      border: none;
+      background: rgba(0,0,0,.08);
+      color: var(--muted);
+      width: 22px;
+      height: 22px;
+      border-radius: 99px;
+      font-size: 12px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+    }
+
+    .search-clear.show {
+      display: flex;
+    }
+
+    .cat-select-btn {
+      flex: none;
+      border: 1.5px solid var(--line);
+      background: var(--card);
+      color: var(--green-dark);
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 11px;
+      outline: none;
+      cursor: pointer;
+      max-width: 130px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .chips-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
     .chips {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       overflow-x: auto;
-      padding: 10px 2px 4px;
-      scrollbar-width: none
+      padding: 2px 2px 4px;
+      scrollbar-width: none;
+      flex: 1;
     }
 
     .chips::-webkit-scrollbar {
@@ -161,10 +214,13 @@
       color: var(--ink);
       font-family: var(--font-display);
       font-weight: 500;
-      font-size: 13.5px;
-      padding: 7px 14px;
+      font-size: 13px;
+      padding: 6px 13px;
       border-radius: 99px;
-      cursor: pointer
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
 
     .chip.on {
@@ -173,16 +229,61 @@
       color: #fff
     }
 
+    .chip.picked-chip {
+      border-color: var(--tag);
+      color: var(--green-dark);
+      background: #FFF8E7;
+      font-weight: 700;
+    }
+
+    .chip.picked-chip.on {
+      background: var(--tag);
+      border-color: var(--tag);
+      color: var(--green-dark);
+    }
+
+    .search-meta {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 4px 16px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
     /* ---------- product list ---------- */
     .cat-head {
       font-family: var(--font-display);
-      font-weight: 600;
+      font-weight: 700;
       font-size: 15px;
       color: var(--green-dark);
-      padding: 18px 16px 8px;
+      padding: 14px 16px 8px;
       display: flex;
       align-items: center;
-      gap: 8px
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .cat-head-badge {
+      font-size: 11.5px;
+      font-weight: 600;
+      background: var(--green-soft);
+      color: var(--green-dark);
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+
+    .cat-head-chevron {
+      margin-left: auto;
+      font-size: 12px;
+      transition: transform .2s;
+      color: var(--muted);
+    }
+
+    .cat-head.collapsed .cat-head-chevron {
+      transform: rotate(-90deg);
     }
 
     .cat-head::after {
@@ -600,14 +701,21 @@
     </header>
 
     <div class="sticky">
-      <div class="search">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-          <circle cx="11" cy="11" r="7" stroke="#22301F" stroke-width="2" />
-          <path d="M20 20l-3.5-3.5" stroke="#22301F" stroke-width="2" stroke-linecap="round" />
-        </svg>
-        <input id="q" type="search" placeholder="ค้นหาสินค้า เช่น คะน้า, มะนาว…" oninput="render()">
+      <div class="search-row">
+        <div class="search">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="#22301F" stroke-width="2" />
+            <path d="M20 20l-3.5-3.5" stroke="#22301F" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <input id="q" type="search" placeholder="ค้นหาสินค้า เช่น คะน้า, มะนาว…" oninput="onSearchInput()">
+          <button id="searchClear" class="search-clear" onclick="clearSearch()" aria-label="ล้างคำค้นหา">✕</button>
+        </div>
+        <select id="catSelect" class="cat-select-btn" onchange="setCat(this.value)" aria-label="เลือกหมวดหมู่"></select>
       </div>
-      <div class="chips" id="chips"></div>
+      <div class="chips-row">
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="search-meta" id="searchMeta"></div>
     </div>
 
     <main id="list"></main>
@@ -689,7 +797,13 @@
     let PRODUCTS = [];
     let isPriceLoading = true;
     let CATS = ["ทั้งหมด"];
-    function rebuildCats() { CATS = ["ทั้งหมด", ...new Set(PRODUCTS.map(p => p.c))]; }
+    let collapsedCats = {};
+    const PICKED_CAT = "🛒 เลือกแล้ว";
+
+    function rebuildCats() {
+      const rawCats = [...new Set(PRODUCTS.map(p => p.c))];
+      CATS = ["ทั้งหมด", PICKED_CAT, ...rawCats];
+    }
     let cart = {};        // name -> qty
     let activeCat = "ทั้งหมด";
 
@@ -700,47 +814,134 @@
     function cartTotal() { return Object.entries(cart).reduce((s, [n, q]) => s + find(n).p * q, 0); }
     function cartCount() { return Object.keys(cart).length; }
 
+    /* ================= search & collapse ================= */
+    function onSearchInput() {
+      const q = document.getElementById("q").value;
+      const clearBtn = document.getElementById("searchClear");
+      if (clearBtn) clearBtn.classList.toggle("show", q.length > 0);
+      render();
+    }
+    function clearSearch() {
+      const qInput = document.getElementById("q");
+      if (qInput) qInput.value = "";
+      const clearBtn = document.getElementById("searchClear");
+      if (clearBtn) clearBtn.classList.remove("show");
+      render();
+    }
+    function toggleCatCollapse(cat) {
+      collapsedCats[cat] = !collapsedCats[cat];
+      render();
+    }
+
     /* ================= render ================= */
     function renderChips() {
-      document.getElementById("chips").innerHTML = CATS.map(c =>
-        `<button class="chip ${c === activeCat ? "on" : ""}" onclick="setCat('${c}')">${c}</button>`).join("");
+      const chipsEl = document.getElementById("chips");
+      const catSelectEl = document.getElementById("catSelect");
+      const pickedCount = cartCount();
+      
+      chipsEl.innerHTML = CATS.map(c => {
+        const isPicked = c === PICKED_CAT;
+        const label = isPicked ? `🛒 เลือกแล้ว (${pickedCount})` : c;
+        const pickedClass = isPicked ? "picked-chip" : "";
+        return `<button class="chip ${pickedClass} ${c === activeCat ? "on" : ""}" onclick="setCat('${c}')">${label}</button>`;
+      }).join("");
+
+      if (catSelectEl) {
+        catSelectEl.innerHTML = CATS.map(c => {
+          const label = c === PICKED_CAT ? `🛒 เลือกแล้ว (${pickedCount})` : c;
+          return `<option value="${c}" ${c === activeCat ? "selected" : ""}>${label}</option>`;
+        }).join("");
+      }
     }
-    function setCat(c) { activeCat = c; renderChips(); render(); }
+
+    function setCat(c) {
+      activeCat = c;
+      renderChips();
+      render();
+    }
 
     function render() {
       const list = document.getElementById("list");
+      const metaEl = document.getElementById("searchMeta");
+
       if (isPriceLoading) {
         list.innerHTML = `<div class="empty">⏳ กำลังดึงข้อมูลราคาสินค้าล่าสุด...</div>`;
+        if (metaEl) metaEl.textContent = "";
         updateBar();
         return;
       }
+
       const q = document.getElementById("q").value.trim();
-      let items = PRODUCTS.filter(p =>
-        (activeCat === "ทั้งหมด" || p.c === activeCat) && (!q || p.n.includes(q)));
+      let items = PRODUCTS.filter(p => {
+        let matchCat = false;
+        if (activeCat === "ทั้งหมด") matchCat = true;
+        else if (activeCat === PICKED_CAT) matchCat = (cart[p.n] || 0) > 0;
+        else matchCat = (p.c === activeCat);
+
+        let matchQuery = !q || p.n.includes(q) || p.c.includes(q) || p.u.includes(q);
+        return matchCat && matchQuery;
+      });
+
+      if (metaEl) {
+        if (q || activeCat !== "ทั้งหมด") {
+          metaEl.textContent = `แสดง ${items.length} จาก ${PRODUCTS.length} รายการ`;
+        } else {
+          metaEl.textContent = `สินค้าทั้งหมด ${PRODUCTS.length} รายการ`;
+        }
+      }
+
       if (!items.length) {
-        list.innerHTML = PRODUCTS.length
-          ? `<div class="empty">ไม่พบ "${q}" — ลองพิมพ์ชื่ออื่น หรือแจ้งเพิ่มในหมายเหตุตอนสรุปออเดอร์ได้เลย</div>`
-          : `<div class="empty">⚠️ ไม่พบบุคคลหรือรายการสินค้า(โปรดตรวจสอบข้อมูล)</div>`;
+        if (activeCat === PICKED_CAT) {
+          list.innerHTML = `<div class="empty">ยังไม่ได้เลือกสินค้า — กดปุ่ม + ที่รายการสินค้าเพื่อใส่ตะกร้า</div>`;
+        } else if (q) {
+          list.innerHTML = `<div class="empty">ไม่พบ "${q}" — ลองพิมพ์ชื่ออื่น หรือแจ้งเพิ่มในหมายเหตุตอนสรุปออเดอร์ได้เลย</div>`;
+        } else {
+          list.innerHTML = `<div class="empty">⚠️ ไม่พบบุคคลหรือรายการสินค้า (โปรดตรวจสอบข้อมูล)</div>`;
+        }
         updateBar();
         return;
       }
-      let html = "", lastCat = "";
+
+      // จัดกลุ่มตามหมวดหมู่
+      const grouped = {};
       for (const p of items) {
-        if (p.c !== lastCat) { html += `<div class="cat-head">${p.c}</div>`; lastCat = p.c; }
-        const qty = cart[p.n] || 0;
-        html += `
-    <div class="item ${qty ? "picked" : ""}">
-      <div class="item-info">
-        <div class="item-name">${p.n}</div>
-        <div class="item-price">${p.p} บาท/${p.u}</div>
-      </div>
-      <div class="stepper">
-        <button aria-label="ลด ${p.n}" onclick="step('${p.n}',-1)">−</button>
-        <span class="qty">${qty ? fmt(qty) : "–"}<small>${p.u}</small></span>
-        <button aria-label="เพิ่ม ${p.n}" onclick="step('${p.n}',1)">+</button>
-      </div>
-    </div>`;
+        if (!grouped[p.c]) grouped[p.c] = [];
+        grouped[p.c].push(p);
       }
+
+      let html = "";
+      const isFiltered = Boolean(q || activeCat !== "ทั้งหมด");
+
+      for (const [catName, catItems] of Object.entries(grouped)) {
+        // หากค้นหาอยู่หรือกรอก filter ให้เปิดหมด ถ้าดูปกติยอมให้พับได้
+        const isCollapsed = !isFiltered && Boolean(collapsedCats[catName]);
+        
+        html += `
+        <div class="cat-head ${isCollapsed ? "collapsed" : ""}" onclick="toggleCatCollapse('${catName}')">
+          <span>${catName}</span>
+          <span class="cat-head-badge">${catItems.length}</span>
+          <span class="cat-head-chevron">▼</span>
+        </div>`;
+
+        if (!isCollapsed) {
+          for (const p of catItems) {
+            const qty = cart[p.n] || 0;
+            html += `
+            <div class="item ${qty ? "picked" : ""}">
+              <div class="item-info">
+                <div class="item-name">${p.n}</div>
+                <div class="item-price">${p.p} บาท/${p.u}</div>
+              </div>
+              <div class="stepper">
+                <button aria-label="ลด ${p.n}" onclick="step('${p.n}',-1)">−</button>
+                <span class="qty">${qty ? fmt(qty) : "–"}<small>${p.u}</small></span>
+                <button aria-label="เพิ่ม ${p.n}" onclick="step('${p.n}',1)">+</button>
+              </div>
+            </div>`;
+          }
+        }
+      }
+
       list.innerHTML = html;
       updateBar();
     }
@@ -749,6 +950,7 @@
       const p = find(name);
       const next = Math.max(0, +((cart[name] || 0) + dir * p.s).toFixed(1));
       if (next === 0) delete cart[name]; else cart[name] = next;
+      renderChips();
       render();
     }
 
