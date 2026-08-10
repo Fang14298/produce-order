@@ -16,7 +16,7 @@
 
 // ================= ตั้งค่า LINE Messaging API / LINE Notify =================
 var LINE_CHANNEL_ACCESS_TOKEN = "/ZSNTT8339UJqvXWWQh7fLKBitoZeH7xUFj9+X92XCbewBkFXaUVx8+NZUoUiUMLzvfKu6hLux+EKGFcgtXKtYoLKRJBndcULx1g+EDXdI4NiBdTqNe4U5xEdSmlXJ8oqZrqlYpJumD5w0viHChkPAdB04t89/1O/w1cDnyilFU="; 
-var ADMIN_LINE_USER_ID = "";         // ⚠️ วาง LINE User ID ของแอดมินร้านค้าที่นี่ (เช่น U1234567890abcdef...) เพื่อรับการแจ้งเตือน
+var ADMIN_LINE_USER_ID = "U2f4e0d8f6e656dbaa7788c3ac1363675";         // ⚠️ วาง LINE User ID ของแอดมินร้านค้าที่นี่ (เช่น U1234567890abcdef...) เพื่อรับการแจ้งเตือน
 var ADMIN_LINE_NOTIFY_TOKEN = "";    // (ไม่บังคับ) วาง LINE Notify Token ของแอดมินร้าน (ถ้าใช้ LINE Notify)
 
 function doPost(e) {
@@ -35,6 +35,8 @@ function doPost(e) {
         "เลขที่ออเดอร์",
         "วัน-เวลาสั่งซื้อ",
         "ชื่อร้าน / ลูกค้า",
+        "ที่อยู่จัดส่ง",
+        "เลขผู้เสียภาษี",
         "วันที่รับของ",
         "รายการสินค้าที่สั่ง",
         "ยอดรวม (บาท)",
@@ -53,6 +55,16 @@ function doPost(e) {
       sheet.setFrozenRows(1);
     }
     
+    if (!e || !e.postData || !e.postData.contents) {
+      Logger.log("doPost ถูกเรียกใช้โดยตรงโดยไม่มี payload (ข้อมูล e.postData เป็น undefined)");
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          result: "warning",
+          message: "ฟังก์ชั่น doPost จะทำงานเมื่อได้รับคำขอ HTTP POST จากหน้าเว็บเท่านั้น หากต้องการทดสอบใน Apps Script โปรดเลือกฟังก์ชั่น testDoPost แล้วกด 'เรียกใช้'"
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
     var data = JSON.parse(e.postData.contents);
     
     var timestamp = new Date();
@@ -69,6 +81,8 @@ function doPost(e) {
     }
     
     var shopName = data.shop || "(ไม่ระบุชื่อร้าน)";
+    var address = data.address || "(ไม่ระบุที่อยู่)";
+    var taxId = data.taxId || "-";
     var deliveryDate = data.date || "พรุ่งนี้";
     var totalAmount = data.totalAmount || 0;
     var note = data.note || "";
@@ -79,6 +93,8 @@ function doPost(e) {
       orderId,
       formattedTime,
       shopName,
+      address,
+      taxId,
       deliveryDate,
       itemsSummary,
       totalAmount,
@@ -91,11 +107,13 @@ function doPost(e) {
     var receiptText = "🧾 ใบสั่งซื้อ — ร้านสวนผักสด\n" +
                       "เลขที่: " + orderId + "\n" +
                       "ชื่อลูกค้า: " + shopName + "\n" +
-                      "วันรับของ: " + deliveryDate + "\n" +
-                      "———————\n" +
-                      itemsSummary + "\n" +
-                      "———————\n" +
-                      "💰 รวมทั้งสิ้น: " + Number(totalAmount).toLocaleString("th-TH") + " บาท";
+                      "ที่อยู่จัดส่ง: " + address + "\n";
+    if (taxId && taxId !== "-") receiptText += "เลขผู้เสียภาษี: " + taxId + "\n";
+    receiptText += "วันรับของ: " + deliveryDate + "\n" +
+                   "———————\n" +
+                   itemsSummary + "\n" +
+                   "———————\n" +
+                   "💰 รวมทั้งสิ้น: " + Number(totalAmount).toLocaleString("th-TH") + " บาท";
     if (note) receiptText += "\n📝 หมายเหตุ: " + note;
 
     // 2. ส่งแจ้งเตือนหาแอดมินร้านค้า (LINE Notify หรือ Messaging API Push)
@@ -164,4 +182,29 @@ function sendLinePushMessage(channelToken, toUserId, messageText) {
 
 function doGet(e) {
   return ContentService.createTextOutput("Google Apps Script Webhook & LINE Bot Service for ร้านสวนผักสด is running online!");
+}
+
+// ฟังก์ชั่นสำหรับกดทดสอบระบบในเมนู Apps Script IDE (เลือก testDoPost แล้วกด 'เรียกใช้')
+function testDoPost() {
+  var mockEvent = {
+    postData: {
+      contents: JSON.stringify({
+        shop: "ร้านทดสอบ (Apps Script IDE)",
+        address: "99/99 อาคารทดสอบ ถนนสุขุมวิท กทม.",
+        taxId: "0105559999999",
+        date: "พรุ่งนี้",
+        note: "ทดสอบกดจาก Apps Script",
+        totalAmount: 150,
+        items: [
+          { name: "คะน้า", qty: 2, unit: "กก.", price: 40, subtotal: 80 },
+          { name: "เห็ดฟาง", qty: 1, unit: "กก.", price: 70, subtotal: 70 }
+        ],
+        itemsSummary: "• คะน้า 2 กก. = 80 บาท\n• เห็ดฟาง 1 กก. = 70 บาท",
+        lineUserId: ADMIN_LINE_USER_ID,
+        lineDisplayName: "Test Admin"
+      })
+    }
+  };
+  var result = doPost(mockEvent);
+  Logger.log("Test Result: " + result.getContent());
 }

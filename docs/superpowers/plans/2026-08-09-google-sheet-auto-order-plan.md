@@ -1,215 +1,160 @@
-# ระบบบันทึกออเดอร์ลง Google Sheet อัตโนมัติ & จำชื่อร้านค้า Implementation Plan
+# ระบบบันทึกออเดอร์ลง Google Sheet อัตโนมัติ & จำชื่อร้านค้า/ที่อยู่/เลขผู้เสียภาษี Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** ✅ Completed & Verified  
+> **Last Updated:** 10 สิงหาคม 2026
 
-**Goal:** เพิ่มระบบจำชื่อร้านค้าลงใน LocalStorage ของเบราว์เซอร์ และเพิ่มระบบบันทึกออเดอร์ลง Google Sheet อัตโนมัติ (ผ่าน Google Apps Script Webhook) เมื่อลูกค้ากดส่งออเดอร์ทาง LINE
+**Goal:** เพิ่มระบบจำชื่อร้านค้า ที่อยู่จัดส่ง (บังคับ) และเลขประจำตัวผู้เสียภาษี (ไม่บังคับ) ลงใน LocalStorage ของเบราว์เซอร์, เพิ่มระบบดึงราคาสดจาก Google Sheet GViz API, บันทึกออเดอร์ลง Google Sheet อัตโนมัติ (ผ่าน Google Apps Script Webhook), และยิงแจ้งเตือนผ่าน LINE Messaging API (Dual Push ทั้งฝั่งแอดมินและลูกค้า)
 
 **Architecture:** 
-- ใน `index.html` อ่าน/บันทึกค่าชื่อร้านจาก `localStorage.getItem('produce_order_shop_name')` / `setItem`
-- เพิ่มฟังก์ชั่น `postOrderToSheet(orderPayload)` ใช้ `fetch(SHEET_WEBHOOK_URL, ...)` ในโหมด `no-cors` เพื่อส่งข้อมูลออเดอร์เข้า Google Apps Script Webhook โดยไม่บล็อกการทำงานหลัก
-- ปรับฟังก์ชั่น `sendLine()` และ `copyOrder()` ให้เรียก `postOrderToSheet()` เบื้องหลังก่อนเปิด URL LINE
+- ใน `index.html` อ่าน/บันทึกค่าชื่อร้าน ที่อยู่ และเลขผู้เสียภาษีผ่าน `localStorage` (`produce_order_shop_name`, `produce_order_address`, `produce_order_tax_id`)
+- ฟังก์ชั่น `postOrderToSheet(orderPayload)` ส่งข้อมูลออเดอร์รวมถึง `address` และ `taxId` เข้า Google Apps Script Webhook
+- ฟังก์ชั่น `submitOrder()` ทำงานแบบเบื้องหลัง: บันทึกข้อมูลลง LocalStorage + ยิง Webhook เข้า Google Sheet + รีเซ็ตตะกร้าสินค้า + แสดง Toast แจ้งเตือน
+- Google Apps Script ใช้งาน `LockService` จัดการ Concurrency และบันทึกลง Google Sheet ตาราง 11 คอลัมน์ (A-K) พร้อมยิง LINE Messaging API Push Messages หาแอดมินร้านและส่งใบทวนออเดอร์กลับหาลูกค้า
 
-**Tech Stack:** HTML5, Vanilla JavaScript (ES6+), LocalStorage API, Fetch API, Google Apps Script
+**Tech Stack:** HTML5, Vanilla JavaScript (ES6+), LINE LIFF SDK, LocalStorage API, Fetch API (GViz + Webhook), Google Apps Script (Messaging API)
 
 ## Global Constraints
 
 - **Color Scheme**: `light only` (คงเดิม)
 - **Cutoff Time**: `19:00 น.` (คงเดิม)
-- **Minimum Delivery Date**: `วันพรุ่งนี้` (คงเดิม)
-- **Validation**: ชื่อร้านเป็นช่องบังคับ (`*`)
-- **LINE OA URL**: `https://line.me/R/oaMessage/%40746wpose/?`
+- **Minimum Delivery Date**: `วันพรุ่งนี้` (คงเดิม + iOS Auto Fix Event Listener)
+- **Validation**:
+  - ชื่อร้านค้า (`*`) — บังคับกรอก
+  - ที่อยู่จัดส่ง (`*`) — บังคับกรอก
+  - เลขประจำตัวผู้เสียภาษี — ไม่บังคับกรอก (จำลง LocalStorage เมื่อมีการกรอก)
+- **LINE OA URL / LIFF**: Integrated via LINE LIFF ID `2011037440-PBPwdRGn`
 
 ---
 
-### Task 1: เพิ่มระบบจำชื่อร้านค้าด้วย LocalStorage
-
-**Files:**
-- Modify: `index.html:346-380`, `index.html:420-438`
-
-**Interfaces:**
-- Consumes: `<input id="shop">` element in DOM
-- Produces: `saveShopName()`, `loadShopName()` in `index.html`
-
-- [ ] **Step 1: เพิ่มฟังก์ชั่น `loadShopName()` และ `saveShopName()`**
-
-```javascript
-const SHOP_STORAGE_KEY = "produce_order_shop_name";
-
-function loadShopName() {
-  const saved = localStorage.getItem(SHOP_STORAGE_KEY);
-  if (saved) {
-    const shopInput = document.getElementById("shop");
-    if (shopInput) shopInput.value = saved;
-  }
-}
-
-function saveShopName(val) {
-  if (val && val.trim()) {
-    localStorage.setItem(SHOP_STORAGE_KEY, val.trim());
-  }
-}
-```
-
-- [ ] **Step 2: เรียกใช้ `loadShopName()` ในช่วง `init` และผูก event listener `onchange` / `oninput` บนช่อง `#shop`**
-
-```javascript
-document.getElementById("shop").addEventListener("input", function() {
-  saveShopName(this.value);
-});
-```
-
-- [ ] **Step 3: ตรวจสอบการทำงานของ LocalStorage**
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add index.html
-git commit -m "feat: add LocalStorage memory for shop name"
-```
-
----
-
-### Task 2: เพิ่มฟังก์ชั่น `postOrderToSheet()` ส่งออเดอร์เข้า Google Apps Script Webhook
-
-**Files:**
-- Modify: `index.html:180-186`, `index.html:333-360`
-
-**Interfaces:**
-- Consumes: `cart`, `PRODUCTS`, `#shop`, `#date`, `#note`
-- Produces: `SHEET_WEBHOOK_URL`, `postOrderToSheet(payload)`
-
-- [ ] **Step 1: เพิ่มตัวแปร `SHEET_WEBHOOK_URL` ในหมวด config**
-
-```javascript
-/* ================= config ================= */
-const SHEET_ID = "1ihPCg3VKhS59B5RrlKuvFZi9IsZesESkXmrb02cS-84";
-// วาง Web App URL ที่ได้จากการ Deploy Google Apps Script ในเครื่องหมายคำพูดด้านล่าง
-const SHEET_WEBHOOK_URL = ""; 
-```
-
-- [ ] **Step 2: สร้างฟังก์ชั่น `postOrderToSheet()` ใน `index.html`**
-
-```javascript
-function buildOrderPayload() {
-  const shop = document.getElementById("shop").value.trim() || "(ไม่ระบุชื่อร้าน)";
-  const date = document.getElementById("date").value || "พรุ่งนี้";
-  const note = document.getElementById("note").value.trim();
-  
-  const items = Object.entries(cart).map(([n, q]) => {
-    const p = find(n);
-    return {
-      name: n,
-      qty: q,
-      unit: p.u,
-      price: p.p,
-      subtotal: p.p * q
-    };
-  });
-  
-  let itemsSummary = "";
-  for (const [n, q] of Object.entries(cart)) {
-    const p = find(n);
-    itemsSummary += `• ${n} ${fmt(q)} ${p.u} = ${p.p * q} บาท\n`;
-  }
-  
-  return {
-    shop: shop,
-    date: date,
-    note: note,
-    totalAmount: cartTotal(),
-    items: items,
-    itemsSummary: itemsSummary.trim()
-  };
-}
-
-function postOrderToSheet() {
-  if (!SHEET_WEBHOOK_URL) {
-    console.log("ยังไม่ได้ตั้งค่า SHEET_WEBHOOK_URL — ข้ามการส่งเข้า Google Sheet");
-    return;
-  }
-  
-  const payload = buildOrderPayload();
-  
-  try {
-    fetch(SHEET_WEBHOOK_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify(payload)
-    }).then(() => {
-      console.log("ส่งข้อมูลออเดอร์เข้า Google Sheet เรียบร้อยแล้ว");
-    }).catch(err => {
-      console.warn("ไม่สามารถส่งออเดอร์เข้า Google Sheet ได้:", err);
-    });
-  } catch (e) {
-    console.warn("เกิดข้อผิดพลาดในการเรียก Webhook:", e);
-  }
-}
-```
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add index.html
-git commit -m "feat: add postOrderToSheet function for GAS webhook integration"
-```
-
----
-
-### Task 3: ปรับแต่ง `sendLine()` และ `copyOrder()` ให้รองรับ Dual Action
-
-**Files:**
-- Modify: `index.html:361-375`
-
-**Interfaces:**
-- Consumes: `validateOrder()`, `saveShopName()`, `postOrderToSheet()`
-- Produces: Updated `sendLine()` and `copyOrder()`
-
-- [ ] **Step 1: ปรับปรุง `sendLine()`**
-
-```javascript
-function sendLine() {
-  if (!validateOrder()) return;
-  const shopName = document.getElementById("shop").value.trim();
-  saveShopName(shopName);
-  postOrderToSheet();
-  
-  const url = "https://line.me/R/oaMessage/%40746wpose/?" + encodeURIComponent(orderText());
-  copyOrder();
-  window.open(url, "_blank");
-}
-```
-
-- [ ] **Step 2: ปรับปรุง `copyOrder()`**
-
-```javascript
-function copyOrder() {
-  if (!validateOrder()) return;
-  const shopName = document.getElementById("shop").value.trim();
-  saveShopName(shopName);
-  
-  navigator.clipboard.writeText(orderText())
-    .then(() => toast("คัดลอกแล้ว วางส่งใน LINE ได้เลย ✓"))
-    .catch(() => toast("คัดลอกไม่สำเร็จ ลองกดค้างเลือกข้อความแทน"));
-}
-```
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add index.html
-git commit -m "feat: integrate dual action (auto-save sheet + localstorage + line open)"
-```
-
----
-
-### Task 4: ตรวจสอบและทดสอบโค้ดทั้งหมด (Verification)
+### Task 1: เพิ่มระบบจำชื่อร้านค้า ที่อยู่จัดส่ง และเลขผู้เสียภาษีด้วย LocalStorage
 
 **Files:**
 - Modify: `index.html`
 
-- [ ] **Step 1: ตรวจสอบความถูกต้องของไวยากรณ์ JavaScript และ HTML tags ใน `index.html`**
-- [ ] **Step 2: ทดสอบจำลองการส่งออเดอร์และการอ่าน LocalStorage ใน DOM environment**
-- [ ] **Step 3: Commit และสรุปผลการพัฒนา**
+**Interfaces:**
+- Consumes: `<input id="shop">`, `<textarea id="address">`, `<input id="taxId">` elements in DOM
+- Produces: `saveSavedFields()`, `loadSavedFields()` in `index.html`
+
+- [x] **Step 1: เพิ่มฟังก์ชั่น `loadSavedFields()` และ `saveSavedFields()`**
+
+```javascript
+const SHOP_STORAGE_KEY = "produce_order_shop_name";
+const ADDRESS_STORAGE_KEY = "produce_order_address";
+const TAX_ID_STORAGE_KEY = "produce_order_tax_id";
+
+function loadSavedFields(){
+  try{
+    const savedShop = localStorage.getItem(SHOP_STORAGE_KEY);
+    if(savedShop && document.getElementById("shop")) document.getElementById("shop").value = savedShop;
+    const savedAddress = localStorage.getItem(ADDRESS_STORAGE_KEY);
+    if(savedAddress && document.getElementById("address")) document.getElementById("address").value = savedAddress;
+    const savedTaxId = localStorage.getItem(TAX_ID_STORAGE_KEY);
+    if(savedTaxId && document.getElementById("taxId")) document.getElementById("taxId").value = savedTaxId;
+  }catch(e){}
+}
+function saveSavedFields(){
+  try{
+    const shopVal = document.getElementById("shop") ? document.getElementById("shop").value.trim() : "";
+    if(shopVal) localStorage.setItem(SHOP_STORAGE_KEY, shopVal);
+    const addressVal = document.getElementById("address") ? document.getElementById("address").value.trim() : "";
+    if(addressVal) localStorage.setItem(ADDRESS_STORAGE_KEY, addressVal);
+    const taxIdVal = document.getElementById("taxId") ? document.getElementById("taxId").value.trim() : "";
+    if(taxIdVal) localStorage.setItem(TAX_ID_STORAGE_KEY, taxIdVal); else localStorage.removeItem(TAX_ID_STORAGE_KEY);
+  }catch(e){}
+}
+```
+
+- [x] **Step 2: เรียกใช้ `loadSavedFields()` ในช่วง `init` และผูก event listener `input` บนช่อง `#shop`, `#address`, `#taxId`**
+
+```javascript
+["shop","address","taxId"].forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.addEventListener("input", saveSavedFields);
+});
+```
+
+- [x] **Step 3: ตรวจสอบการทำงานของ LocalStorage**
+
+- [x] **Step 4: Commit**
+
+---
+
+### Task 2: เพิ่มฟังก์ชั่น `postOrderToSheet()` ส่งออเดอร์รวมที่อยู่และเลขผู้เสียภาษีเข้า Webhook
+
+**Files:**
+- Modify: `index.html`, `examples/google-apps-script.gs`
+
+**Interfaces:**
+- Consumes: `cart`, `PRODUCTS`, `#shop`, `#address`, `#taxId`, `#date`, `#note`, `liffProfile`
+- Produces: `buildOrderPayload()`, `postOrderToSheet()`, Google Apps Script Sheet 11 Columns
+
+- [x] **Step 1: อัปเดต `buildOrderPayload()` ใน `index.html`**
+
+```javascript
+function buildOrderPayload(){
+  return {
+    shop: document.getElementById("shop").value.trim() || "(ไม่ระบุชื่อร้าน)",
+    address: document.getElementById("address").value.trim() || "(ไม่ระบุที่อยู่)",
+    taxId: document.getElementById("taxId").value.trim(),
+    date: document.getElementById("date").value || "พรุ่งนี้",
+    note: document.getElementById("note").value.trim(),
+    totalAmount: cartTotal(),
+    items: items,
+    itemsSummary: itemsSummary.trim(),
+    lineUserId: liffProfile ? liffProfile.userId : "",
+    lineDisplayName: liffProfile ? liffProfile.displayName : ""
+  };
+}
+```
+
+- [x] **Step 2: อัปเดต Google Apps Script (`examples/google-apps-script.gs`)**
+  - เพิ่มคอลัมน์ `"ที่อยู่จัดส่ง"` และ `"เลขผู้เสียภาษี"` ใน `headers`
+  - บันทึกลงตาราง และใส่ที่อยู่/เลขผู้เสียภาษีลงในข้อความแจ้งเตือน `receiptText`
+
+- [x] **Step 3: Commit**
+
+---
+
+### Task 3: ปรับแต่งระบบตรวจสอบข้อมูล (`validateOrder()`)
+
+**Files:**
+- Modify: `index.html`
+
+- [x] **Step 1: บังคับกรอกที่อยู่จัดส่งใน `validateOrder()`**
+
+```javascript
+function validateOrder(){
+  const shopInput = document.getElementById("shop");
+  if(!shopInput.value.trim()){
+    shopInput.focus();
+    toast("กรุณากรอกชื่อร้าน/ลูกค้าก่อนส่งออเดอร์");
+    return false;
+  }
+  const addressInput = document.getElementById("address");
+  if(!addressInput.value.trim()){
+    addressInput.focus();
+    toast("กรุณากรอกที่อยู่จัดส่งก่อนส่งออเดอร์");
+    return false;
+  }
+  const dateInput = document.getElementById("date");
+  if(!dateInput.value || dateInput.value < dateInput.min){
+    dateInput.focus();
+    toast("กรุณาเลือกวันที่รับของตั้งแต่พรุ่งนี้เป็นต้นไป");
+    return false;
+  }
+  return true;
+}
+```
+
+- [x] **Step 2: Commit**
+
+---
+
+### Task 4: ตรวจสอบและรับรองความถูกต้อง (Verification)
+
+**Files:**
+- Modify: `index.html`, `examples/google-apps-script.gs`, `README.md`, `docs/superpowers/specs/`, `docs/superpowers/plans/`
+
+- [x] **Step 1: ตรวจสอบความถูกต้องของไวยากรณ์ JavaScript ใน `index.html`** (ผ่านการตรวจสอบ 100%)
+- [x] **Step 2: ทดสอบจำลองการส่งออเดอร์และการอ่าน LocalStorage สำหรับ 3 ฟิลด์**
+- [x] **Step 3: อัปเดตเอกสารทั้งหมด (`README.md`, `specs/`, `plans/`) ให้สอดคล้องกัน**
