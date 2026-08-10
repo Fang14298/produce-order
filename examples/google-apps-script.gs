@@ -310,18 +310,18 @@ function cleanDateText(val) {
   if (!val) return "พรุ่งนี้";
   var str = String(val).trim();
   
-  // หากเป็น YYYY-MM-DD เช่น 2026-08-11 -> แปลงเป็น 11/08/2026
-  var matchISO = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (matchISO) {
-    return matchISO[3] + "/" + matchISO[2] + "/" + matchISO[1];
-  }
-  
-  // หากเป็น DD/MM/YYYY อยู่แล้ว ให้คืนค่าเลย
+  // 1. หากเป็น DD/MM/YYYY อยู่แล้ว ให้คืนค่าเลย
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
     return str;
   }
   
-  // หากเป็น Date Object หรือ สตริง Date สากลยาวๆ
+  // 2. หากเป็น YYYY-MM-DD เช่น 2026-08-11 -> แปลงเป็น 11/08/2026
+  var matchISO = str.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (matchISO) {
+    return matchISO[3] + "/" + matchISO[2] + "/" + matchISO[1];
+  }
+  
+  // 3. หากเป็น Date Object หรือ สตริง Date สากลยาวๆ
   try {
     var d = new Date(val);
     if (!isNaN(d.getTime())) {
