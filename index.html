@@ -983,11 +983,17 @@
     <hr class="r-line">${rows}<hr class="r-line">
     <div class="r-total"><span>รวมทั้งหมด</span><span>${money(cartTotal())}</span></div>`;
     }
+    function formatDateDMY(str) {
+      if (!str) return "พรุ่งนี้";
+      const m = String(str).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return m ? `${m[3]}/${m[2]}/${m[1]}` : str;
+    }
     function orderText() {
       const shop = document.getElementById("shop").value.trim() || "(ไม่ระบุชื่อร้าน)";
       const address = document.getElementById("address").value.trim() || "(ไม่ระบุที่อยู่)";
       const taxId = document.getElementById("taxId").value.trim();
-      const date = document.getElementById("date").value || "พรุ่งนี้";
+      const rawDate = document.getElementById("date").value || "พรุ่งนี้";
+      const date = formatDateDMY(rawDate);
       const note = document.getElementById("note").value.trim();
       let t = `รายการสั่งซื้อ\nออเดอร์: ${shop}\nที่อยู่จัดส่ง: ${address}\n`;
       if (taxId) t += `เลขผู้เสียภาษี: ${taxId}\n`;
@@ -1064,7 +1070,7 @@
       const shop = document.getElementById("shop").value.trim() || "(ไม่ระบุชื่อร้าน)";
       const address = document.getElementById("address").value.trim() || "(ไม่ระบุที่อยู่)";
       const taxId = document.getElementById("taxId").value.trim();
-      const date = document.getElementById("date").value || "พรุ่งนี้";
+      const date = formatDateDMY(document.getElementById("date").value);
       const note = document.getElementById("note").value.trim();
       const items = Object.entries(cart).map(([n, q]) => {
         const p = find(n);

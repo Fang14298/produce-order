@@ -83,7 +83,7 @@ function doPost(e) {
     var shopName = data.shop || "(ไม่ระบุชื่อร้าน)";
     var address = data.address || "(ไม่ระบุที่อยู่)";
     var taxId = data.taxId || "-";
-    var deliveryDate = data.date || "พรุ่งนี้";
+    var deliveryDate = cleanDateText(data.date);
     var totalAmount = data.totalAmount || 0;
     var note = data.note || "";
     var lineUserId = data.lineUserId || "";
@@ -305,17 +305,27 @@ function testOnEditStatus() {
   onEditStatus(mockEvent);
 }
 
-// ฟังก์ชั่นจัดการจัดรูปแบบข้อความวันที่ให้อ่านง่าย (แปลง Tue Aug 11 2026... ให้เป็น 2026-08-11)
+// ฟังก์ชั่นจัดการจัดรูปแบบข้อความวันที่ให้อ่านง่าย รูปแบบ วัน/เดือน/ปี (dd/MM/yyyy)
 function cleanDateText(val) {
   if (!val) return "พรุ่งนี้";
   var str = String(val).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+  
+  // หากเป็น YYYY-MM-DD เช่น 2026-08-11 -> แปลงเป็น 11/08/2026
+  var matchISO = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (matchISO) {
+    return matchISO[3] + "/" + matchISO[2] + "/" + matchISO[1];
+  }
+  
+  // หากเป็น DD/MM/YYYY อยู่แล้ว ให้คืนค่าเลย
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
     return str;
   }
+  
+  // หากเป็น Date Object หรือ สตริง Date สากลยาวๆ
   try {
     var d = new Date(val);
     if (!isNaN(d.getTime())) {
-      return Utilities.formatDate(d, "GMT+7", "yyyy-MM-dd");
+      return Utilities.formatDate(d, "GMT+7", "dd/MM/yyyy");
     }
   } catch (e) {}
   return str;
