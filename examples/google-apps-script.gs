@@ -208,3 +208,93 @@ function testDoPost() {
   var result = doPost(mockEvent);
   Logger.log("Test Result: " + result.getContent());
 }
+
+/**
+ * ฟังก์ชั่น ทริกเกอร์อัตโนมัติเมื่อแอดมินแก้ไขข้อมูลใน Google Sheet (Installable / Simple Trigger)
+ * เมื่อแอดมินเปลี่ยนค่าในคอลัมน์ "สถานะ" (คอลัมน์ J = 10)
+ * สคริปต์จะอ่าน LINE User ID ในคอลัมน์ K (คอลัมน์ 11) แล้วส่งข้อความแจ้งเตือนหาลูกค้าทาง LINE Messaging API
+ */
+function onEditStatus(e) {
+  try {
+    if (!e || !e.range) return;
+    
+    var sheet = e.range.getSheet();
+    if (sheet.getName() !== "รายการออเดอร์") return;
+    
+    var row = e.range.getRow();
+    var col = e.range.getColumn();
+    
+    // คอลัมน์ J = 10 (สถานะ) ข้ามแถวที่ 1 (หัวตาราง)
+    if (row <= 1 || col !== 10) return;
+    
+    var newStatus = String(e.value || "").trim();
+    var oldStatus = String(e.oldValue || "").trim();
+    if (!newStatus || newStatus === oldStatus) return;
+    
+    // อ่านข้อมูลทั้งแถว [orderId, formattedTime, shopName, address, taxId, deliveryDate, itemsSummary, totalAmount, note, status, lineUserId]
+    var rowValues = sheet.getRange(row, 1, 1, 11).getValues()[0];
+    
+    var orderId = rowValues[0];
+    var shopName = rowValues[2] || "ลูกค้า";
+    var deliveryDate = rowValues[5] || "พรุ่งนี้";
+    var lineUserId = rowValues[10];
+    
+    if (!lineUserId) {
+      Logger.log("ไม่มี LINE User ID ในแถวที่ " + row + " — ข้ามการยิงแจ้งเตือน");
+      return;
+    }
+    
+    var messageText = "";
+    if (newStatus === "ยืนยันแล้ว") {
+      messageText = "🟢 อัปเดตสถานะออเดอร์ #" + orderId + "\n" +
+                    "ร้านสวนผักสดได้ \"ยืนยันออเดอร์\" ของคุณ (" + shopName + ") เรียบร้อยแล้วค่ะ 🙏\n" +
+                    "วันรับของ: " + deliveryDate + "\n" +
+                    "ขอบพระคุณที่อุดหนุนค่ะ ❤️";
+    } else if (newStatus === "กำลังจัดส่ง") {
+      messageText = "🚚 ออเดอร์ของคุณกำลังเดินทาง! #" + orderId + "\n" +
+                    "ออเดอร์ของร้าน " + shopName + " กำลังถูกนำส่งไปยังที่อยู่จัดส่งเรียบร้อยแล้วค่ะ\n" +
+                    "โปรดเตรียมรอรับสินค้าได้เลยค่ะ 🥬";
+    } else if (newStatus === "จัดส่งเรียบร้อย") {
+      messageText = "✅ จัดส่งสำเร็จแล้ว! #" + orderId + "\n" +
+                    "ออเดอร์ของร้าน " + shopName + " จัดส่งเรียบร้อยแล้วค่ะ\n" +
+                    "ขอบคุณที่ไว้วางใจร้านสวนผักสดนะคะ 🙏❤️";
+    } else if (newStatus === "ยกเลิก" || newStatus === "ยกเลิกออเดอร์") {
+      messageText = "❌ อัปเดตสถานะออเดอร์ #" + orderId + "\n" +
+                    "ออเดอร์ของคุณได้ถูกยกเลิกแล้วค่ะ\n" +
+                    "หากมีข้อสงสัยเพิ่มเติม สามารถสอบถามแอดมินทางแชทนี้ได้เลยค่ะ";
+    } else {
+      messageText = "🔔 อัปเดตสถานะออเดอร์ #" + orderId + "\n" +
+                    "สถานะปัจจุบัน: " + newStatus + "\n" +
+                    "ขอบคุณที่ใช้บริการร้านสวนผักสดค่ะ 🙏";
+    }
+    
+    if (LINE_CHANNEL_ACCESS_TOKEN && lineUserId) {
+      sendLinePushMessage(LINE_CHANNEL_ACCESS_TOKEN, lineUserId, messageText);
+      Logger.log("ยิงข้อความอัปเดตสถานะ '" + newStatus + "' หา LINE User ID: " + lineUserId + " สำเร็จ");
+    }
+  } catch (err) {
+    Logger.log("onEditStatus Error: " + err.toString());
+  }
+}
+
+// ฟังก์ชั่นสำหรับกดทดสอบการยิงแจ้งเตือนเมื่อเปลี่ยนสถานะใน Apps Script IDE (เลือก testOnEditStatus แล้วกด 'เรียกใช้')
+function testOnEditStatus() {
+  if (!ADMIN_LINE_USER_ID) {
+    Logger.log("⚠️ กรุณาระบุ ADMIN_LINE_USER_ID ก่อนทดสอบ");
+    return;
+  }
+  var mockEvent = {
+    range: {
+      getSheet: function() {
+        return {
+          getName: function() { return "รายการออเดอร์"; }
+        };
+      },
+      getRow: function() { return 2; },
+      getColumn: function() { return 10; }
+    },
+    value: "กำลังจัดส่ง",
+    oldValue: "รอยืนยัน"
+  };
+  onEditStatus(mockEvent);
+}

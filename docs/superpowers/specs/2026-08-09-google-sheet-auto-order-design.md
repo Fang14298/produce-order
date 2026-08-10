@@ -1,7 +1,7 @@
 # Design Spec: ระบบบันทึกออเดอร์ Google Sheet & LINE LIFF + Messaging API
 
 **วันที่ออกแบบ**: 9 สิงหาคม 2026  
-**อัปเดตล่าสุด**: 10 สิงหาคม 2026 (เพิ่มฟิลด์ที่อยู่จัดส่ง [บังคับ] และเลขประจำตัวผู้เสียภาษี [ไม่บังคับ] พร้อมระบบจำลง LocalStorage และบันทึกลง Google Sheet คอลัมน์ A-K)  
+**อัปเดตล่าสุด**: 10 สิงหาคม 2026 (เพิ่มระบบทริกเกอร์แจ้งเตือน LINE อัตโนมัติเมื่อแอดมินเปลี่ยนสถานะออเดอร์ใน Google Sheet via `onEditStatus`)  
 **โปรเจกต์**: ระบบสั่งผัก-ผลไม้ออนไลน์ (ร้านสวนผักสด) — `Fang14298/produce-order`  
 
 ---
@@ -13,11 +13,12 @@
 **เป้าหมายหลัก**:
 1. **ระบบสั่งซื้อผ่าน LINE LIFF อัตโนมัติ**: เมื่อลูกค้าเปิดหน้าเว็บผ่าน LINE ระบบจะดึงข้อมูลตัวตนลูกค้า (`lineUserId`, `displayName`) อัตโนมัติ เมื่อกด "ส่งออเดอร์" ระบบจะส่งข้อมูลออเดอร์เข้า Google Sheet และส่งใบทวนออเดอร์ยืนยันเข้าแชท LINE ของลูกค้าโดยตรง
 2. **การแจ้งเตือนแอดมินเรียลไทม์ (Admin Push Alert)**: เมื่อมีออเดอร์ใหม่ลง Google Sheet ระบบจะส่งข้อความแจ้งเตือนสรุปออเดอร์เด้งเข้า LINE แอดมินร้านค้าทันที พร้อมระบุที่อยู่จัดส่งและเลขผู้เสียภาษี (ถ้ามี)
-3. **การจำข้อมูลลูกค้า (LocalStorage)**:
+3. **การแจ้งเตือนลูกค้าอัตโนมัติเมื่อแอดมินเปลี่ยนสถานะ (`onEditStatus`)**: ทันทีที่แอดมินคลิกเปลี่ยนสถานะในคอลัมน์ J (`สถานะ`) ใน Google Sheet เช่น `รอยืนยัน` ➔ `ยืนยันแล้ว`, `กำลังจัดส่ง`, `จัดส่งเรียบร้อย` ระบบจะยิงแชท LINE Push Message ไปบอกลูกค้าเจ้าของออเดอร์อัตโนมัติ Real-time
+4. **การจำข้อมูลลูกค้า (LocalStorage)**:
    - จำชื่อร้าน/ลูกค้า (`produce_order_shop_name`) — บังคับกรอก `*`
    - จำที่อยู่จัดส่ง (`produce_order_address`) — บังคับกรอก `*`
-   - จำเลขประจำตัวผู้เสียภาษี (`produce_order_tax_id`) — ไม่บังคับกรอก (จำเมื่อมีการกรอก)
-4. **การดึงราคาสดและการควบคุมวันที่สั่งซื้อ**: ดึงราคาสินค้าจากชีต `"ราคาระบบ"` แบบไดนามิก และบังคับเลือกวันรับสินค้าล่วงหน้าตั้งแต่ **วันพรุ่งนี้** เป็นต้นไป
+   - จำเลขประจำตัวผู้เสียภาษี (`produce_order_tax_id`) — ไม่บังคับกรอก
+5. **การดึงราคาสดและการควบคุมวันที่สั่งซื้อ**: ดึงราคาสินค้าจากชีต `"ราคาระบบ"` แบบไดนามิก 100% และบังคับเลือกวันรับสินค้าล่วงหน้าตั้งแต่ **วันพรุ่งนี้** เป็นต้นไป
 
 ---
 
@@ -26,11 +27,12 @@
 ```mermaid
 sequenceDiagram
     autonumber
+    actor Admin as แอดมินร้านค้า (Google Sheet)
     actor Customer as ลูกค้า (สั่งผักใน LINE)
     participant WebApp as หน้าเว็บสั่งซื้อ (index.html / LIFF)
     participant Storage as LocalStorage (เครื่องลูกค้า)
     participant GViz as Google Sheet GViz API
-    participant GAS as Google Apps Script Webhook
+    participant GAS as Google Apps Script (Webhook & Trigger)
     participant Sheet as Google Sheet (รายการออเดอร์)
     participant AdminLine as LINE ร้านค้า / แอดมิน
     participant CustomerLine as แชท LINE ของลูกค้า
@@ -39,7 +41,7 @@ sequenceDiagram
     Customer->>WebApp: เปิดหน้าเว็บสั่งซื้อ / เปิดผ่าน LINE LIFF
     WebApp->>Storage: อ่านข้อมูลที่เคยพิมพ์ไว้ (ชื่อร้าน, ที่อยู่จัดส่ง, เลขผู้เสียภาษี)
     WebApp->>GViz: ดึงราคาสดจากชีต "ราคาระบบ" (gviz/tq)
-    GViz-->>WebApp: คืนค่ารายการสินค้าและราคาล่าสุด (ถ้าล้มเหลวใช้ fallback)
+    GViz-->>WebApp: คืนค่ารายการสินค้าและราคาล่าสุด
     WebApp->>WebApp: กำหนดค่า min date = วันพรุ่งนี้
 
     Note over Customer,CustomerLine: 2. การสั่งซื้อ & บันทึกออเดอร์
@@ -50,11 +52,16 @@ sequenceDiagram
         WebApp->>GAS: POST JSON (ออเดอร์ + shop + address + taxId + lineUserId)
         GAS->>GAS: LockService.getScriptLock() (ป้องกันข้อมูลชนกัน)
         GAS->>Sheet: เพิ่มแถวใน "รายการออเดอร์" (คอลัมน์ A-K, Order ID: ORD-YYYYMMDD-HHmmss)
-        GAS->>AdminLine: ยิง LINE Push เตือนแอดมิน "🔔 มีออเดอร์ใหม่เข้า!" (พร้อมที่อยู่ & เลขผู้เสียภาษี)
+        GAS->>AdminLine: ยิง LINE Push เตือนแอดมิน "🔔 มีออเดอร์ใหม่เข้า!"
         GAS->>CustomerLine: ยิงข้อความยืนยันออเดอร์กลับเข้าแชทลูกค้า (Messaging API)
     and 2.2 ประสบการณ์ฝั่งลูกค้า
         WebApp-->>Customer: ขึ้น Toast "ส่งออเดอร์เรียบร้อยแล้ว ✓" และปิดหน้าสรุปออเดอร์
     end
+
+    Note over Admin,CustomerLine: 3. การอัปเดตสถานะ & แจ้งเตือนลูกค้า (Status Change Alert)
+    Admin->>Sheet: เปลี่ยนสถานะในคอลัมน์ J (เช่น "กำลังจัดส่ง")
+    Sheet->>GAS: ทริกเกอร์ onEditStatus(e) ทำงานอัตโนมัติ
+    GAS->>CustomerLine: ยิง LINE Push แจ้งอัปเดตสถานะ "🚚 ออเดอร์ของคุณกำลังเดินทาง! #ORD-..."
 ```
 
 ---
@@ -74,7 +81,7 @@ const LIFF_ID = "2011037440-PBPwdRGn";
 ### 3.2 คอนฟิกใน Google Apps Script ([`examples/google-apps-script.gs`](file:///C:/Users/fang0/produce-order/examples/google-apps-script.gs))
 ```javascript
 var LINE_CHANNEL_ACCESS_TOKEN = "/ZSNTT8339UJqvXWWQh7fLKBitoZeH7xUFj9+X92XCbewBkFXaUVx8+NZUoUiUMLzvfKu6hLux+EKGFcgtXKtYoLKRJBndcULx1g+EDXdI4NiBdTqNe4U5xEdSmlXJ8oqZrqlYpJumD5w0viHChkPAdB04t89/1O/w1cDnyilFU=";
-var ADMIN_LINE_USER_ID = ""; // ระบุ LINE User ID แอดมินสำหรับรับการแจ้งเตือน
+var ADMIN_LINE_USER_ID = "U2f4e0d8f6e656dbaa7788c3ac1363675";
 ```
 
 ---
@@ -112,9 +119,8 @@ var ADMIN_LINE_USER_ID = ""; // ระบุ LINE User ID แอดมินส�
 
 ## 5. การทดสอบและการรับรองความถูกต้อง (Verification & Reliability)
 
-1. **JavaScript Syntax Verification**: โค้ดใน `index.html` ผ่านการตรวจสอบไวยากรณ์ด้วย Node.js `vm.Script` ครบ 100%
-2. **Form Validation Guard**:
-   - ช่องชื่อร้านค้าบังคับกรอก (`*`)
-   - ช่องที่อยู่จัดส่งบังคับกรอก (`*`)
-   - ช่องเลขผู้เสียภาษีรองรับ numeric 13 หลัก (ไม่บังคับ)
-3. **Concurrency Locking**: Google Apps Script เปิดใช้ `LockService.getScriptLock().tryLock(10000)` ป้องกันสคริปต์ทำงานชนกัน
+1. **JavaScript Syntax Verification**: ผ่านการตรวจสอบไวยากรณ์ด้วย Node.js 100%
+2. **Status Change Trigger (`onEditStatus`)**:
+   - อ่านข้อมูลจากคอลัมน์ J (`สถานะ`) และ K (`LINE User ID`)
+   - รองรับสถานะ: `ยืนยันแล้ว`, `กำลังจัดส่ง`, `จัดส่งเรียบร้อย`, `ยกเลิก`
+   - มีฟังก์ชันทดสอบ `testOnEditStatus()` สำหรับรันใน Apps Script IDE
