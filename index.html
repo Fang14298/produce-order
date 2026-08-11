@@ -743,6 +743,11 @@
           autocomplete="organization">
       </div>
       <div class="field">
+        <label for="phone">เบอร์โทรศัพท์ <span style="color:#C0392B">*</span></label>
+        <input id="phone" type="tel" required placeholder="พิมพ์เบอร์โทรศัพท์ เช่น 0812345678"
+          inputmode="tel" autocomplete="tel">
+      </div>
+      <div class="field">
         <label for="address">ที่อยู่จัดส่ง <span style="color:#C0392B">*</span></label>
         <textarea id="address" required placeholder="พิมพ์ที่อยู่จัดส่งสินค้าโดยละเอียด เช่น 123/45 ถนนสุขุมวิท..."
           autocomplete="street-address"></textarea>
@@ -784,6 +789,7 @@
     // (สคริปต์อยู่ในไฟล์ examples/google-apps-script.gs)
     const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxQ-_TdgdewOhf2f1El9RkjAXcu9DYZMJyQhMNR8gyiQZ96Ce6XD2szlA4wH4nY1bp_Xw/exec";
     const SHOP_STORAGE_KEY = "produce_order_shop_name";
+    const PHONE_STORAGE_KEY = "produce_order_phone";
     const ADDRESS_STORAGE_KEY = "produce_order_address";
     const TAX_ID_STORAGE_KEY = "produce_order_tax_id";
 
@@ -1011,12 +1017,13 @@
     }
     function orderText() {
       const shop = document.getElementById("shop").value.trim() || "(ไม่ระบุชื่อร้าน)";
+      const phone = document.getElementById("phone") ? document.getElementById("phone").value.trim() : "";
       const address = document.getElementById("address").value.trim() || "(ไม่ระบุที่อยู่)";
       const taxId = document.getElementById("taxId").value.trim();
       const rawDate = document.getElementById("date").value || "พรุ่งนี้";
       const date = formatDateDMY(rawDate);
       const note = document.getElementById("note").value.trim();
-      let t = `รายการสั่งซื้อ\nออเดอร์: ${shop}\nที่อยู่จัดส่ง: ${address}\n`;
+      let t = `รายการสั่งซื้อ\nออเดอร์: ${shop}\nเบอร์โทร: ${phone}\nที่อยู่จัดส่ง: ${address}\n`;
       if (taxId) t += `เลขผู้เสียภาษี: ${taxId}\n`;
       t += `รับของ: ${date}\n———————\n`;
       for (const [n, q] of Object.entries(cart)) {
@@ -1032,6 +1039,12 @@
       if (!shopInput.value.trim()) {
         shopInput.focus();
         toast("กรุณากรอกชื่อร้าน/ลูกค้าก่อนส่งออเดอร์");
+        return false;
+      }
+      const phoneInput = document.getElementById("phone");
+      if (!phoneInput || !phoneInput.value.trim()) {
+        if (phoneInput) phoneInput.focus();
+        toast("กรุณากรอกเบอร์โทรศัพท์ก่อนส่งออเดอร์");
         return false;
       }
       const addressInput = document.getElementById("address");
@@ -1052,6 +1065,8 @@
       try {
         const savedShop = localStorage.getItem(SHOP_STORAGE_KEY);
         if (savedShop && document.getElementById("shop")) document.getElementById("shop").value = savedShop;
+        const savedPhone = localStorage.getItem(PHONE_STORAGE_KEY);
+        if (savedPhone && document.getElementById("phone")) document.getElementById("phone").value = savedPhone;
         const savedAddress = localStorage.getItem(ADDRESS_STORAGE_KEY);
         if (savedAddress && document.getElementById("address")) document.getElementById("address").value = savedAddress;
         const savedTaxId = localStorage.getItem(TAX_ID_STORAGE_KEY);
@@ -1062,6 +1077,8 @@
       try {
         const shopVal = document.getElementById("shop") ? document.getElementById("shop").value.trim() : "";
         if (shopVal) localStorage.setItem(SHOP_STORAGE_KEY, shopVal);
+        const phoneVal = document.getElementById("phone") ? document.getElementById("phone").value.trim() : "";
+        if (phoneVal) localStorage.setItem(PHONE_STORAGE_KEY, phoneVal);
         const addressVal = document.getElementById("address") ? document.getElementById("address").value.trim() : "";
         if (addressVal) localStorage.setItem(ADDRESS_STORAGE_KEY, addressVal);
         const taxIdVal = document.getElementById("taxId") ? document.getElementById("taxId").value.trim() : "";
@@ -1089,6 +1106,7 @@
     }
     function buildOrderPayload() {
       const shop = document.getElementById("shop").value.trim() || "(ไม่ระบุชื่อร้าน)";
+      const phone = document.getElementById("phone") ? document.getElementById("phone").value.trim() : "";
       const address = document.getElementById("address").value.trim() || "(ไม่ระบุที่อยู่)";
       const taxId = document.getElementById("taxId").value.trim();
       const date = formatDateDMY(document.getElementById("date").value);
@@ -1104,6 +1122,7 @@
       }
       return {
         shop: shop,
+        phone: phone,
         address: address,
         taxId: taxId,
         date: date,
@@ -1208,7 +1227,7 @@
     (function () {
       loadSavedFields();
       initLiff();
-      ["shop", "address", "taxId"].forEach(id => {
+      ["shop", "phone", "address", "taxId"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener("input", saveSavedFields);
       });

@@ -35,6 +35,7 @@ function doPost(e) {
         "เลขที่ออเดอร์",
         "วัน-เวลาสั่งซื้อ",
         "ชื่อร้าน / ลูกค้า",
+        "เบอร์โทรศัพท์",
         "ที่อยู่จัดส่ง",
         "เลขผู้เสียภาษี",
         "วันที่รับของ",
@@ -81,6 +82,7 @@ function doPost(e) {
     }
     
     var shopName = data.shop || "(ไม่ระบุชื่อร้าน)";
+    var phone = data.phone || "(ไม่ระบุเบอร์โทร)";
     var address = data.address || "(ไม่ระบุที่อยู่)";
     var taxId = data.taxId || "-";
     var deliveryDate = cleanDateText(data.date);
@@ -93,6 +95,7 @@ function doPost(e) {
       orderId,
       formattedTime,
       shopName,
+      phone,
       address,
       taxId,
       deliveryDate,
@@ -109,6 +112,7 @@ function doPost(e) {
     var receiptText = "🧾 ใบสั่งซื้อ — ร้านสวนผักสด\n" +
                       "เลขที่: " + orderId + "\n" +
                       "ชื่อลูกค้า: " + shopName + "\n" +
+                      "เบอร์โทร: " + phone + "\n" +
                       "ที่อยู่จัดส่ง: " + address + "\n";
     if (taxId && taxId !== "-") receiptText += "เลขผู้เสียภาษี: " + taxId + "\n";
     receiptText += "วันรับของ: " + deliveryDate + "\n" +
@@ -192,6 +196,7 @@ function testDoPost() {
     postData: {
       contents: JSON.stringify({
         shop: "ร้านทดสอบ (Apps Script IDE)",
+        phone: "0812345678",
         address: "99/99 อาคารทดสอบ ถนนสุขุมวิท กทม.",
         taxId: "0105559999999",
         date: "พรุ่งนี้",
@@ -226,22 +231,41 @@ function onEditStatus(e) {
     var row = e.range.getRow();
     var col = e.range.getColumn();
     
-    // คอลัมน์ J = 10 (สถานะ) ข้ามแถวที่ 1 (หัวตาราง)
-    if (row <= 1 || col !== 10) return;
+    if (row <= 1) return;
+    
+    var maxCols = Math.max(12, sheet.getLastColumn());
+    var headerRow = sheet.getRange(1, 1, 1, maxCols).getDisplayValues()[0];
+    var getColIndex = function(name) {
+      for (var i = 0; i < headerRow.length; i++) {
+        if (String(headerRow[i] || "").indexOf(name) !== -1) return i + 1;
+      }
+      return -1;
+    };
+    
+    var statusCol = getColIndex("สถานะ");
+    if (statusCol <= 0) statusCol = 11;
+    if (col !== statusCol) return;
     
     var newStatus = String(e.value || "").trim();
     var oldStatus = String(e.oldValue || "").trim();
     if (!newStatus || newStatus === oldStatus) return;
     
-    // อ่านข้อมูลทั้งแถวแบบแสดงผล [orderId, formattedTime, shopName, address, taxId, deliveryDate, itemsSummary, totalAmount, note, status, lineUserId]
-    var displayValues = sheet.getRange(row, 1, 1, 11).getDisplayValues()[0];
-    var rawValues = sheet.getRange(row, 1, 1, 11).getValues()[0];
+    var displayValues = sheet.getRange(row, 1, 1, maxCols).getDisplayValues()[0];
+    var rawValues = sheet.getRange(row, 1, 1, maxCols).getValues()[0];
     
-    var orderId = displayValues[0] || rawValues[0];
-    var shopName = displayValues[2] || "ลูกค้า";
-    var rawDate = displayValues[5] || rawValues[5];
+    var getVal = function(name, fallbackIdx) {
+      var idx = getColIndex(name) - 1;
+      if (idx >= 0 && idx < displayValues.length) {
+        return displayValues[idx] || rawValues[idx];
+      }
+      return fallbackIdx >= 0 ? (displayValues[fallbackIdx] || rawValues[fallbackIdx]) : "";
+    };
+    
+    var orderId = getVal("เลขที่ออเดอร์", 0);
+    var shopName = getVal("ชื่อร้าน", 2) || "ลูกค้า";
+    var rawDate = getVal("วันที่รับของ", 6);
     var deliveryDate = cleanDateText(rawDate);
-    var lineUserId = String(displayValues[10] || rawValues[10]).trim();
+    var lineUserId = String(getVal("LINE User ID", 11) || "").trim();
     
     if (!lineUserId) {
       Logger.log("ไม่มี LINE User ID ในแถวที่ " + row + " — ข้ามการยิงแจ้งเตือน");
