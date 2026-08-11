@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>ใบส่งสินค้า / ใบแจ้งหนี้ | ร้านสวนผักสด</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --green:#1E6B3C; --green-dark:#14502B; --green-soft:#E7F1E7;
+    --ink:#22301F; --muted:#71806C; --bg:#F7F8F3; --card:#FFFFFF;
+    --line:#E2E7DD; --tag:#F4B942;
+    --font-display:'Prompt',sans-serif; --font-body:'Sarabun',sans-serif;
+    color-scheme: light only;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:var(--bg);color:var(--ink);font-family:var(--font-body)}
+  h1,h2,h3{font-family:var(--font-display)}
+  .app{max-width:1280px;margin:0 auto;padding:20px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .topbar h1{font-size:20px;color:var(--green-dark)}
+  .topbar .sub{font-size:13px;color:var(--muted)}
+  .layout{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
+  @media (max-width:980px){.layout{grid-template-columns:1fr}}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .panel h2{font-size:15px;margin-bottom:10px;color:var(--green-dark)}
+  .search-box{position:relative;margin-bottom:10px}
+  .search-box input{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-family:var(--font-body);font-size:14px}
+  .search-box input:focus{outline:none;border-color:var(--green)}
+  .order-list{max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+  .order-item{border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer;transition:.15s}
+  .order-item:hover{border-color:var(--green);background:var(--green-soft)}
+  .order-item.active{border-color:var(--green);background:var(--green-soft);box-shadow:0 0 0 2px var(--green) inset}
+  .order-item .oid{font-weight:700;font-size:13px;color:var(--green-dark)}
+  .order-item .ometa{font-size:12px;color:var(--muted);margin-top:2px;display:flex;justify-content:space-between;gap:8px}
+  .status-pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;background:#eee;color:#555;margin-top:4px}
+  .empty-msg{font-size:13px;color:var(--muted);padding:20px 6px;text-align:center}
+  .reload-btn{width:100%;padding:9px;margin-top:10px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-family:var(--font-body);font-size:13px;cursor:pointer;color:var(--ink)}
+  .reload-btn:hover{border-color:var(--green);color:var(--green-dark)}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .toolbar .fee-field{display:flex;align-items:center;gap:6px;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+  .toolbar .fee-field input{width:80px;border:none;font-family:var(--font-body);font-size:13px;text-align:right}
+  .toolbar .fee-field input:focus{outline:none}
+  .btn{padding:10px 18px;border-radius:10px;border:none;font-family:var(--font-body);font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn-print{background:var(--green);color:#fff}
+  .btn-print:hover{background:var(--green-dark)}
+  .btn-pdf{background:#2C3E50;color:#fff}
+  .btn-pdf:hover{background:#1c2833}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .invoice-wrap{background:#d9d9d9;border-radius:14px;padding:24px;display:flex;justify-content:center}
+  #invoicePage{
+    width:210mm;min-height:297mm;background:#fff;padding:14mm 12mm;
+    box-shadow:0 4px 18px rgba(0,0,0,.18);font-family:var(--font-body);color:#111;
+  }
+  .inv-placeholder{display:flex;align-items:center;justify-content:center;min-height:297mm;color:#999;font-size:14px}
+
+  .inv-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid var(--green);padding-bottom:12px;margin-bottom:16px}
+  .inv-brand{display:flex;align-items:center;gap:12px}
+  .inv-logo-emoji{width:54px;height:54px;display:flex;align-items:center;justify-content:center;font-size:32px;background:var(--green-soft);border-radius:12px}
+  .inv-brand-title{font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--green)}
+  .inv-brand-sub{font-size:12px;color:#555;margin-top:1px}
+  .inv-brand-contact{font-size:11.5px;color:#444;margin-top:3px}
+  .inv-meta{text-align:right}
+  .inv-doc-title{font-family:var(--font-display);font-size:19px;font-weight:700;color:#222}
+  .inv-meta-line{font-size:12.5px;color:#333;margin-top:3px}
+  .inv-meta-line b{color:#111}
+  .inv-meta-sub{font-size:11px;color:#888;margin-top:2px}
+
+  .inv-customer{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:12.5px;margin-bottom:16px;padding:11px 14px;background:#f9f9f7;border-radius:8px;border:1px solid #eee}
+  .inv-customer div b{color:#333}
+
+  table.inv-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px}
+  table.inv-table th{border-top:2px solid #333;border-bottom:2px solid #333;padding:7px 6px;text-align:left;font-weight:700;font-family:var(--font-display);font-size:12px}
+  table.inv-table td{border-bottom:1px solid #eee;padding:7px 6px;vertical-align:top}
+  table.inv-table th.num,table.inv-table td.num{text-align:right}
+  table.inv-table th.center,table.inv-table td.center{text-align:center}
+  table.inv-table tfoot td{border-top:1px solid #ccc;border-bottom:none;padding-top:10px}
+
+  .inv-bottom{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;margin-top:6px;align-items:start}
+  .inv-payment-box{border:1px solid #ccc;border-radius:8px;padding:12px;display:flex;gap:12px;align-items:center}
+  .inv-qr-img{width:100px;height:100px;border-radius:6px;border:1px solid #ddd;flex-shrink:0}
+  .inv-payment-info{font-size:11.5px;line-height:1.55}
+  .inv-payment-info .lbl{font-weight:700;font-size:12.5px;color:var(--green-dark);margin-bottom:2px}
+  .inv-totals{border:1px solid #ccc;border-radius:8px;padding:12px 14px;font-size:12.5px}
+  .inv-total-row{display:flex;justify-content:space-between;margin-bottom:7px}
+  .inv-total-row.grand{font-size:16px;font-weight:700;border-top:1.5px solid #333;padding-top:7px;margin-top:2px;color:var(--green-dark)}
+  .inv-note{font-size:11.5px;color:#555;margin-top:10px;padding:8px 10px;background:#fffaf0;border:1px dashed #e0c069;border-radius:6px}
+
+  .inv-signatures{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:34px;text-align:center;font-size:11.5px}
+  .inv-sig-line{border-bottom:1px dashed #888;height:34px;margin-bottom:6px}
+
+  @media print{
+    body *{visibility:hidden}
+    #invoicePage,#invoicePage *{visibility:visible}
+    #invoicePage{position:absolute;left:0;top:0;box-shadow:none;margin:0}
+    .invoice-wrap{padding:0;background:#fff}
+    @page{size:A4;margin:0}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div>
+      <h1>🧾 ระบบพิมพ์ใบส่งสินค้า / ใบแจ้งหนี้</h1>
+      <div class="sub">ร้านสวนผักสด — ดึงข้อมูลสดจากชีต "รายการออเดอร์"</div>
+    </div>
+    <div class="sub">index.html สำหรับลูกค้า &nbsp;•&nbsp; invoice.html หน้านี้สำหรับแอดมิน</div>
+  </div>
+
+  <div class="layout">
+    <div class="panel">
+      <h2>🔎 ค้นหาออเดอร์</h2>
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="ค้นหาเลขที่ออเดอร์ / ชื่อลูกค้า / เบอร์โทร">
+      </div>
+      <div class="order-list" id="orderList">
+        <div class="empty-msg">กำลังโหลดรายการออเดอร์...</div>
+      </div>
+      <button class="reload-btn" id="reloadBtn">⟳ โหลดออเดอร์ล่าสุด</button>
+    </div>
+
+    <div>
+      <div class="toolbar">
+        <button class="btn btn-print" id="printBtn" disabled>🖨️ พิมพ์บิล</button>
+        <button class="btn btn-pdf" id="pdfBtn" disabled>⬇️ ดาวน์โหลด PDF</button>
+        <div class="fee-field">
+          <span>ค่าจัดส่ง:</span>
+          <input type="number" id="deliveryFee" value="0" min="0" step="1">
+          <span>บาท</span>
+        </div>
+      </div>
+
+      <div class="invoice-wrap">
+        <div id="invoicePage">
+          <div class="inv-placeholder" id="invPlaceholder">เลือกออเดอร์จากรายการด้านซ้ายเพื่อแสดงใบบิล</div>
+          <div id="invContent" style="display:none">
+            <div class="inv-header">
+              <div class="inv-brand">
+                <div class="inv-logo-emoji" aria-hidden="true">🥬</div>
+                <div>
+                  <div class="inv-brand-title">สวนผักสด</div>
+                  <div class="inv-brand-sub">สินค้าสดใหม่ คุณภาพส่งตรงถึงบ้าน</div>
+                  <div class="inv-brand-contact">โทร: 093-3121105, 086-5868988 &nbsp;|&nbsp; Line: @746wpose</div>
+                </div>
+              </div>
+              <div class="inv-meta">
+                <div class="inv-doc-title">ใบส่งสินค้า / ใบแจ้งหนี้</div>
+                <div class="inv-meta-line"><b>เลขที่:</b> <span id="mOrderId">-</span></div>
+                <div class="inv-meta-line"><b>วันที่ส่งสินค้า:</b> <span id="mDeliveryDate">-</span></div>
+                <div class="inv-meta-sub">สั่งซื้อเมื่อ <span id="mOrderDate">-</span></div>
+              </div>
+            </div>
+
+            <div class="inv-customer">
+              <div><b>ชื่อลูกค้า:</b> <span id="mShop">-</span></div>
+              <div><b>เบอร์โทรศัพท์:</b> <span id="mPhone">-</span></div>
+              <div><b>เลขประจำตัวผู้เสียภาษี:</b> <span id="mTaxId">-</span></div>
+              <div><b>ที่อยู่จัดส่ง:</b> <span id="mAddress">-</span></div>
+            </div>
+
+            <table class="inv-table">
+              <thead>
+                <tr>
+                  <th class="center" style="width:34px">No.</th>
+                  <th>รายการ</th>
+                  <th class="num" style="width:64px">จำนวน</th>
+                  <th class="center" style="width:64px">หน่วยนับ</th>
+                  <th class="num" style="width:90px">ราคา/หน่วย</th>
+                  <th class="num" style="width:100px">จำนวนเงิน (บาท)</th>
+                </tr>
+              </thead>
+              <tbody id="mItemsBody"></tbody>
+            </table>
+
+            <div id="mNoteWrap" style="display:none" class="inv-note"><b>หมายเหตุ:</b> <span id="mNote"></span></div>
+
+            <div class="inv-bottom">
+              <div class="inv-payment-box">
+                <img class="inv-qr-img" id="mQr" src="" alt="PromptPay QR">
+                <div class="inv-payment-info">
+                  <div class="lbl">📲 สแกนเพื่อชำระเงิน</div>
+                  <div><b>ชื่อบัญชี:</b> นางสาวชวัลลักษณ์ ไพบูลย์ชมพู</div>
+                  <div><b>PromptPay:</b> 093-3121105</div>
+                  <div style="font-size:10.5px;color:#777;margin-top:4px">*กรุณาตรวจนับสินค้าให้ถูกต้องก่อนสแกนชำระเงิน*</div>
+                </div>
+              </div>
+              <div class="inv-totals">
+                <div class="inv-total-row"><span>รวมราคาสินค้า:</span><span id="mSubtotal">0.00 บาท</span></div>
+                <div class="inv-total-row"><span>ค่าจัดส่งเดลิเวอรี่:</span><span id="mDeliveryFeeShow">0.00 บาท</span></div>
+                <div class="inv-total-row grand"><span>ยอดชำระสุทธิ:</span><span id="mGrand">0.00 บาท</span></div>
+              </div>
+            </div>
+
+            <div class="inv-signatures">
+              <div><div class="inv-sig-line"></div>ผู้ส่งสินค้า / พนักงานจัดส่ง</div>
+              <div><div class="inv-sig-line"></div>ผู้รับสินค้า / ผู้ชำระเงิน</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= ตั้งค่า ================= */
+const SHEET_ID = "1ihPCg3VKhS59B5RrlKuvFZi9IsZesESkXmrb02cS-84";
+const ORDER_SHEET_NAME = "รายการออเดอร์";
+const PROMPTPAY_ID = "0933121105";
+const PROMPTPAY_NAME = "SUANPHAKSOD"; // ต้องเป็น A-Z เท่านั้นตามสเปค EMVCo
+
+let ORDERS = [];
+let SELECTED = null;
+
+/* ================= โหลดออเดอร์จาก Google Sheet (GViz, อ่านอย่างเดียว ไม่ต้องมี backend) ================= */
+async function loadOrders() {
+  const list = document.getElementById("orderList");
+  list.innerHTML = '<div class="empty-msg">กำลังโหลดรายการออเดอร์...</div>';
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(ORDER_SHEET_NAME)}&headers=1`;
+    const text = await (await fetch(url)).text();
+    const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
+    const labels = json.table.cols.map(c => String(c.label || "").trim());
+    const col = names => labels.findIndex(l => names.some(n => l.includes(n)));
+    const iId = col(["เลขที่ออเดอร์"]);
+    const iDt = col(["วัน-เวลาสั่งซื้อ", "วัน-เวลา"]);
+    const iShop = col(["ชื่อร้าน", "ลูกค้า"]);
+    const iPhone = col(["เบอร์โทรศัพท์", "เบอร์โทร"]);
+    const iAddr = col(["ที่อยู่จัดส่ง"]);
+    const iTax = col(["เลขผู้เสียภาษี"]);
+    const iDate = col(["วันที่รับของ"]);
+    const iItems = col(["รายการสินค้าที่สั่ง"]);
+    const iTotal = col(["ยอดรวม"]);
+    const iNote = col(["หมายเหตุ"]);
+    const iStatus = col(["สถานะ"]);
+    const iLine = col(["LINE User ID"]);
+
+    const val = (r, i) => (i >= 0 && r.c && r.c[i] && r.c[i].v != null) ? r.c[i].v : "";
+
+    ORDERS = json.table.rows
+      .map(r => ({
+        orderId: String(val(r, iId)).trim(),
+        orderDate: String(val(r, iDt)).trim(),
+        shop: String(val(r, iShop)).trim(),
+        phone: String(val(r, iPhone)).trim(),
+        address: String(val(r, iAddr)).trim(),
+        taxId: String(val(r, iTax)).trim(),
+        deliveryDate: String(val(r, iDate)).trim(),
+        itemsRaw: String(val(r, iItems)).trim(),
+        total: Number(val(r, iTotal)) || 0,
+        note: String(val(r, iNote)).trim(),
+        status: String(val(r, iStatus)).trim() || "รอยืนยัน",
+        lineUserId: String(val(r, iLine)).trim()
+      }))
+      .filter(o => o.orderId);
+
+    renderList(document.getElementById("searchInput").value.trim());
+
+    if (ORDERS.length && !SELECTED) selectOrder(ORDERS[0]);
+  } catch (e) {
+    console.warn("โหลดออเดอร์ไม่สำเร็จ:", e);
+    list.innerHTML = '<div class="empty-msg">โหลดข้อมูลไม่สำเร็จ — ตรวจสอบว่าชีตแชร์แบบ "ทุกคนที่มีลิงก์ - ผู้มีสิทธิ์ดู" แล้ว</div>';
+  }
+}
+
+function renderList(filterText) {
+  const list = document.getElementById("orderList");
+  const q = (filterText || "").trim().toLowerCase();
+  const filtered = !q ? ORDERS : ORDERS.filter(o =>
+    o.orderId.toLowerCase().includes(q) ||
+    o.shop.toLowerCase().includes(q) ||
+    o.phone.toLowerCase().includes(q)
+  );
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-msg">ไม่พบออเดอร์ที่ตรงกับคำค้นหา</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(o => `
+    <div class="order-item ${SELECTED && SELECTED.orderId === o.orderId ? 'active' : ''}" data-id="${o.orderId}">
+      <div class="oid">${o.orderId}</div>
+      <div class="ometa"><span>${o.shop || '-'}</span><span>${o.deliveryDate || '-'}</span></div>
+      <span class="status-pill">${o.status}</span>
+    </div>
+  `).join("");
+  list.querySelectorAll(".order-item").forEach(el => {
+    el.addEventListener("click", () => {
+      const order = ORDERS.find(o => o.orderId === el.dataset.id);
+      if (order) selectOrder(order);
+    });
+  });
+}
+
+/* ================= แปลงข้อความสรุปรายการสินค้า กลับเป็นตารางแยกรายชิ้น =================
+   รูปแบบข้อความต้นทาง (จาก Apps Script): "• ชื่อสินค้า จำนวน หน่วย = ยอดรวม บาท" ต่อบรรทัด */
+function parseItems(raw) {
+  if (!raw) return [];
+  return raw.split("\n").map(line => line.trim()).filter(Boolean).map(line => {
+    const clean = line.replace(/^•\s*/, "");
+    const m = clean.match(/^(.+?)\s+([\d.,]+)\s+(\S+?)\s*=\s*([\d.,]+)\s*บาท$/);
+    if (!m) return { name: clean, qty: "", unit: "", price: "", subtotal: 0 };
+    const name = m[1].trim();
+    const qty = parseFloat(m[2].replace(/,/g, ""));
+    const unit = m[3].trim();
+    const subtotal = parseFloat(m[4].replace(/,/g, ""));
+    const price = qty ? subtotal / qty : subtotal;
+    return { name, qty, unit, price, subtotal };
+  });
+}
+
+/* ================= PromptPay EMVCo QR Payload (ออฟไลน์ ไม่พึ่ง API ภายนอก) ================= */
+function formatTLV(id, value) {
+  const length = value.length.toString().padStart(2, '0');
+  return id + length + value;
+}
+function formatPromptPayQR(recipient, amount, merchantName) {
+  recipient = String(recipient || "").replace(/[^0-9]/g, '');
+  if (recipient.length === 10 && recipient.startsWith('0')) {
+    recipient = '0066' + recipient.substring(1);
+  }
+  let payload = '';
+  payload += formatTLV('00', '01');
+  payload += formatTLV('01', '11');
+  let merchantAccount = '';
+  merchantAccount += formatTLV('00', 'A000000677010111');
+  merchantAccount += formatTLV('01', recipient);
+  payload += formatTLV('29', merchantAccount);
+  payload += formatTLV('52', '0000');
+  payload += formatTLV('53', '764');
+  if (amount && parseFloat(amount) > 0) {
+    payload += formatTLV('54', parseFloat(amount).toFixed(2));
+  }
+  payload += formatTLV('58', 'TH');
+  const mName = String(merchantName || 'PromptPay').replace(/[^A-Za-z0-9 ]/g, '').substring(0, 25);
+  payload += formatTLV('59', mName || 'PromptPay');
+  payload += formatTLV('60', 'Bangkok');
+  payload += '6304';
+  return payload + crc16(payload).toUpperCase();
+}
+function crc16(s) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < s.length; i++) {
+    crc ^= s.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+      crc &= 0xffff;
+    }
+  }
+  return crc.toString(16).padStart(4, '0');
+}
+function renderQr(amount) {
+  const payload = formatPromptPayQR(PROMPTPAY_ID, amount, PROMPTPAY_NAME);
+  const qr = qrcode(0, 'M');
+  qr.addData(payload);
+  qr.make();
+  document.getElementById("mQr").src = qr.createDataURL(6, 4);
+}
+
+/* ================= แสดงผลใบบิล ================= */
+const fmtMoney = n => Number(n || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function selectOrder(order) {
+  SELECTED = order;
+  document.getElementById("invPlaceholder").style.display = "none";
+  document.getElementById("invContent").style.display = "block";
+  document.getElementById("printBtn").disabled = false;
+  document.getElementById("pdfBtn").disabled = false;
+
+  document.getElementById("mOrderId").textContent = order.orderId;
+  document.getElementById("mDeliveryDate").textContent = order.deliveryDate || "-";
+  document.getElementById("mOrderDate").textContent = order.orderDate || "-";
+  document.getElementById("mShop").textContent = order.shop || "-";
+  document.getElementById("mPhone").textContent = order.phone || "-";
+  document.getElementById("mTaxId").textContent = (order.taxId && order.taxId !== "-") ? order.taxId : "-";
+  document.getElementById("mAddress").textContent = order.address || "-";
+
+  const items = parseItems(order.itemsRaw);
+  document.getElementById("mItemsBody").innerHTML = items.map((it, idx) => `
+    <tr>
+      <td class="center">${idx + 1}</td>
+      <td>${it.name}</td>
+      <td class="num">${it.qty !== "" ? it.qty : "-"}</td>
+      <td class="center">${it.unit || "-"}</td>
+      <td class="num">${it.price !== "" ? fmtMoney(it.price) : "-"}</td>
+      <td class="num">${fmtMoney(it.subtotal)}</td>
+    </tr>
+  `).join("");
+
+  const noteWrap = document.getElementById("mNoteWrap");
+  if (order.note) {
+    noteWrap.style.display = "block";
+    document.getElementById("mNote").textContent = order.note;
+  } else {
+    noteWrap.style.display = "none";
+  }
+
+  recalcTotals();
+  renderList(document.getElementById("searchInput").value.trim());
+}
+
+function recalcTotals() {
+  if (!SELECTED) return;
+  const fee = parseFloat(document.getElementById("deliveryFee").value) || 0;
+  const grand = SELECTED.total + fee;
+  document.getElementById("mSubtotal").textContent = fmtMoney(SELECTED.total) + " บาท";
+  document.getElementById("mDeliveryFeeShow").textContent = fmtMoney(fee) + " บาท";
+  document.getElementById("mGrand").textContent = fmtMoney(grand) + " บาท";
+  renderQr(grand);
+}
+
+/* ================= ปุ่มควบคุม ================= */
+document.getElementById("searchInput").addEventListener("input", e => renderList(e.target.value));
+document.getElementById("reloadBtn").addEventListener("click", loadOrders);
+document.getElementById("deliveryFee").addEventListener("input", recalcTotals);
+document.getElementById("printBtn").addEventListener("click", () => window.print());
+document.getElementById("pdfBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("pdfBtn");
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳ กำลังสร้างไฟล์...";
+  try {
+    const node = document.getElementById("invoicePage");
+    const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+    const imgData = canvas.toDataURL("image/png");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgH = (canvas.height * pageW) / canvas.width;
+    pdf.addImage(imgData, "PNG", 0, 0, pageW, Math.min(imgH, pageH));
+    pdf.save(`ใบแจ้งหนี้-${SELECTED ? SELECTED.orderId : "order"}.pdf`);
+  } catch (e) {
+    alert("สร้าง PDF ไม่สำเร็จ: " + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = original;
+  }
+});
+
+loadOrders();
+</script>
+</body>
+</html>
